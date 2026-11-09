@@ -1,14 +1,14 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import {
   type ColumnDef, type SortingState, type VisibilityState, flexRender, getCoreRowModel, getFilteredRowModel,
   getPaginationRowModel, getSortedRowModel, useReactTable,
 } from "@tanstack/react-table"
 import { ArrowUpDown, Columns3, Download, RotateCcw } from "lucide-react"
-import { toast } from "sonner"
+import { useActionMutation } from "@/hooks/use-action-mutation"
+import { useConfirm } from "@/components/confirm-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { NativeSelect } from "@/components/native-select"
+import { SelectField } from "@/components/select-field"
 import { ActivityLabel, EmptyState, FLAG_LABELS, StatusBadge } from "@/components/common"
 import { displayPhone } from "@/lib/phone"
 import { formatDate } from "@/lib/dates"
@@ -47,14 +47,12 @@ const ACTIVITIES = [["active", "Active"], ["at_risk", "At risk"], ["inactive", "
 export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, deleted }: {
   rows: MemberRow[]; initialQuery: string; initialTab: string; statuses: string[]; teams: string[]; deleted: Deleted[]
 }) {
-  const router = useRouter()
   const [tab, setTab] = useState(initialTab)
   const [q, setQ] = useState(initialQuery)
   const [f, setF] = useState({ status: "", team: "", gender: "", activity: "", responsible: "" })
   const [sorting, setSorting] = useState<SortingState>([])
   const [visibility, setVisibility] = useState<VisibilityState>({ email: false, visits: false, streak: false })
   const [selection, setSelection] = useState<Record<string, boolean>>({})
-  const [pending, start] = useTransition()
 
   const responsibles = useMemo(() => [...new Set(rows.map((r) => r.personResponsible).filter(Boolean) as string[])].sort(), [rows])
 
@@ -143,15 +141,18 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
   })
 
   const selectedIds = Object.keys(selection).filter((k) => selection[k]).map(Number)
-  const bulk = (change: Parameters<typeof bulkUpdateAction>[1]) =>
-    start(async () => {
-      const res = await bulkUpdateAction(selectedIds, change)
-      if (res.ok) {
-        toast.success(`Updated ${selectedIds.length} people`)
-        setSelection({})
-        router.refresh()
-      } else toast.error(res.error)
-    })
+  const confirm = useConfirm()
+  const bulkMutation = useActionMutation(
+    (v: { ids: number[]; change: Parameters<typeof bulkUpdateAction>[1] }) => bulkUpdateAction(v.ids, v.change),
+    { success: (_r, v) => `Updated ${v.ids.length} ${v.ids.length === 1 ? "person" : "people"}`, onSuccess: () => setSelection({}) },
+  )
+  const restore = useActionMutation((id: number) => restoreAction(id), { success: "Restored" })
+  const pending = bulkMutation.isPending || restore.isPending
+  const bulk = async (change: Parameters<typeof bulkUpdateAction>[1]) => {
+    const what = change.status ? `set status to “${change.status}”` : change.addTeam ? `add to “${change.addTeam}”` : `set person responsible to “${change.personResponsible || "nobody"}”`
+    const ok = await confirm({ title: `Update ${selectedIds.length} ${selectedIds.length === 1 ? "person" : "people"}?`, description: `This will ${what} for everyone selected. Each change is logged.`, confirmLabel: "Update" })
+    if (ok) bulkMutation.mutate({ ids: selectedIds, change })
+  }
 
   const exportHref = `/api/export/members?ids=${tab === "fix" || q || Object.values(f).some(Boolean) ? data.map((d) => d.id).join(",") : ""}`
 
@@ -173,10 +174,9 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
                     <TableCell>{formatDate(d.deletedAt, "long")}</TableCell>
                     <TableCell>{formatDate(new Date(new Date(d.deletedAt).getTime() + 30 * 86400000), "long")}</TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={pending} onClick={() => start(async () => {
-                        const r = await restoreAction(d.id)
-                        if (r.ok) { toast.success("Restored"); router.refresh() } else toast.error(r.error)
-                      })}><RotateCcw className="size-4" /> Restore</Button>
+                      <Button size="sm" variant="outline" loading={restore.isPending && restore.variables === d.id} disabled={pending} onClick={() => restore.mutate(d.id)}>
+                        {!(restore.isPending && restore.variables === d.id) && <RotateCcw className="size-4" />} Restore
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -193,27 +193,27 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
       <TabBar tab={tab} setTab={setTab} fixCount={rows.filter((r) => r.flags.some((fl) => fl !== "shared_phone")).length} deletedCount={deleted.length} />
       <div className="flex flex-wrap items-center gap-2">
         <Input value={q} onChange={(e) => { setQ(e.target.value); table.setPageIndex(0) }} placeholder="Search name or phone…" className="w-full sm:w-64" aria-label="Search" />
-        <NativeSelect aria-label="Status" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
+        <SelectField aria-label="Status" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
           <option value="">All statuses</option>
           {statuses.map((s) => <option key={s}>{s}</option>)}
-        </NativeSelect>
-        <NativeSelect aria-label="Activity" value={f.activity} onChange={(e) => setF({ ...f, activity: e.target.value })}>
+        </SelectField>
+        <SelectField aria-label="Activity" value={f.activity} onChange={(e) => setF({ ...f, activity: e.target.value })}>
           <option value="">Any activity</option>
           {ACTIVITIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </NativeSelect>
-        <NativeSelect aria-label="Team" value={f.team} onChange={(e) => setF({ ...f, team: e.target.value })}>
+        </SelectField>
+        <SelectField aria-label="Team" value={f.team} onChange={(e) => setF({ ...f, team: e.target.value })}>
           <option value="">All teams</option>
           <option value="__none">No team</option>
           {teams.map((t) => <option key={t}>{t}</option>)}
-        </NativeSelect>
-        <NativeSelect aria-label="Gender" value={f.gender} onChange={(e) => setF({ ...f, gender: e.target.value })}>
+        </SelectField>
+        <SelectField aria-label="Gender" value={f.gender} onChange={(e) => setF({ ...f, gender: e.target.value })}>
           <option value="">Any gender</option>
           <option>Female</option><option>Male</option><option value="__none">Not set</option>
-        </NativeSelect>
-        <NativeSelect aria-label="Person responsible" value={f.responsible} onChange={(e) => setF({ ...f, responsible: e.target.value })}>
+        </SelectField>
+        <SelectField aria-label="Person responsible" value={f.responsible} onChange={(e) => setF({ ...f, responsible: e.target.value })}>
           <option value="">Any person responsible</option>
           {responsibles.map((r) => <option key={r}>{r}</option>)}
-        </NativeSelect>
+        </SelectField>
         <div className="ml-auto flex gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><Columns3 className="size-4" /> Columns</Button></DropdownMenuTrigger>
@@ -232,14 +232,14 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 p-2 text-sm">
           <span className="font-medium">{selectedIds.length} selected</span>
-          <NativeSelect aria-label="Set status" disabled={pending} defaultValue="" onChange={(e) => e.target.value && bulk({ status: e.target.value })}>
+          <SelectField aria-label="Set status" disabled={pending} defaultValue="" resetOnChange onChange={(e) => e.target.value && bulk({ status: e.target.value })}>
             <option value="">Set status…</option>
             {statuses.map((s) => <option key={s}>{s}</option>)}
-          </NativeSelect>
-          <NativeSelect aria-label="Add team" disabled={pending} defaultValue="" onChange={(e) => e.target.value && bulk({ addTeam: e.target.value })}>
+          </SelectField>
+          <SelectField aria-label="Add team" disabled={pending} defaultValue="" resetOnChange onChange={(e) => e.target.value && bulk({ addTeam: e.target.value })}>
             <option value="">Add to team…</option>
             {teams.map((t) => <option key={t}>{t}</option>)}
-          </NativeSelect>
+          </SelectField>
           <form className="flex gap-1" onSubmit={(e) => { e.preventDefault(); bulk({ personResponsible: String(new FormData(e.currentTarget).get("pr") ?? "") }) }}>
             <Input name="pr" placeholder="Person responsible" className="h-9 w-44" list="responsibles" />
             <datalist id="responsibles">{responsibles.map((r) => <option key={r} value={r} />)}</datalist>

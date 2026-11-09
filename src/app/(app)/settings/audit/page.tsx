@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { NativeSelect } from "@/components/native-select"
+import { SelectField } from "@/components/select-field"
 import { PageHeader } from "@/components/common"
 
 export const metadata = { title: "Audit log" }
@@ -38,14 +38,14 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       <form className="flex flex-wrap gap-2">
         <Input type="date" name="from" defaultValue={sp.from} className="h-9 w-40" aria-label="From" />
         <Input type="date" name="to" defaultValue={sp.to} className="h-9 w-40" aria-label="To" />
-        <NativeSelect name="action" defaultValue={sp.action ?? ""} aria-label="Action">
+        <SelectField name="action" defaultValue={sp.action ?? ""} aria-label="Action">
           <option value="">All actions</option>
           {actions.map((a) => <option key={a.action}>{a.action}</option>)}
-        </NativeSelect>
-        <NativeSelect name="entity" defaultValue={sp.entity ?? ""} aria-label="Record type">
+        </SelectField>
+        <SelectField name="entity" defaultValue={sp.entity ?? ""} aria-label="Record type">
           <option value="">All records</option>
           {entities.map((e) => <option key={e.entity}>{e.entity}</option>)}
-        </NativeSelect>
+        </SelectField>
         <Input name="record" defaultValue={sp.record} placeholder="Record ID" className="h-9 w-28" aria-label="Record ID" />
         <Button variant="secondary">Filter</Button>
         <Button variant="ghost" asChild><Link href="/settings/audit">Clear</Link></Button>

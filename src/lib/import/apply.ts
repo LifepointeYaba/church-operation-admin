@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client"
 import type { AttendanceParseResult, ParsedPerson } from "./attendance"
 import { matchAttendancePerson } from "./matching"
+import { promoteFoundMembers } from "../status-progression"
 import type { HeadcountRow, ParsedNote } from "./headcount"
 
 type Db = PrismaClient
@@ -8,6 +9,7 @@ type Db = PrismaClient
 export type ImportSummary = {
   membersAdded: number
   membersUpdated: number
+  membersPromoted: number
   membersNeedingConfirm: { row: number; name: string }[]
   membersPendingApproval: { row: number; person: ParsedPerson }[]
   servicesAdded: number
@@ -45,6 +47,7 @@ export async function applyAttendanceImport(
   const summary: ImportSummary = {
     membersAdded: 0,
     membersUpdated: 0,
+    membersPromoted: 0,
     membersNeedingConfirm: [],
     membersPendingApproval: [],
     servicesAdded: 0,
@@ -69,6 +72,7 @@ export async function applyAttendanceImport(
     select: { id: true, nameKey: true, phoneKey: true, email: true, gender: true, personResponsible: true, lastName: true },
   })
   const idForRow = new Map<number, number>()
+  const foundIds = new Set<number>()
   const toCreate: typeof parsed.people = []
 
   for (const p of parsed.people) {
@@ -80,6 +84,7 @@ export async function applyAttendanceImport(
     const match = result.kind === "matched" ? result.member : undefined
     if (match) {
       idForRow.set(p.row, match.id)
+      foundIds.add(match.id)
       const data: Prisma.MemberUpdateInput = {}
       if (!match.email && p.email) data.email = p.email
       if (!match.gender && p.gender) data.gender = p.gender
@@ -151,10 +156,24 @@ export async function applyAttendanceImport(
     })
   }
   if (links.length) await db.memberTeam.createMany({ data: links, skipDuplicates: true })
+
+  // Existing people who gain a new Sunday in this file move up a stage. Checking for *new*
+  // marks means re-uploading the same file never promotes anyone twice.
+  const foundMarks = marks.filter((m) => foundIds.has(m.memberId))
+  const already = foundMarks.length
+    ? await db.attendance.findMany({
+      where: { memberId: { in: [...foundIds] }, serviceId: { in: [...new Set(foundMarks.map((m) => m.serviceId))] } },
+      select: { memberId: true, serviceId: true },
+    })
+    : []
+  const have = new Set(already.map((a) => `${a.memberId}|${a.serviceId}`))
+  const promoteIds = new Set(foundMarks.filter((m) => !have.has(`${m.memberId}|${m.serviceId}`)).map((m) => m.memberId))
   for (let i = 0; i < marks.length; i += 5000) {
     const res = await db.attendance.createMany({ data: marks.slice(i, i + 5000), skipDuplicates: true })
     summary.attendanceAdded += res.count
   }
+
+  summary.membersPromoted = await promoteFoundMembers(db, promoteIds, "Attended again (attendance import)")
 
   await refreshDerivedMemberData(db)
   return summary

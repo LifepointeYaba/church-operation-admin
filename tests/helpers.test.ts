@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { displayPhone, normalizePhone } from "@/lib/phone"
 import { nameKey } from "@/lib/keys"
+import { nextStatus } from "@/lib/status-progression"
 import { checkServiceDate, parseSheetDate, isoDate, utcDate } from "@/lib/dates"
 
 describe("normalizePhone", () => {
@@ -40,5 +41,15 @@ describe("dates", () => {
     expect(checkServiceDate(utcDate(2026, 10, 1), today).ok).toBe(true)
     expect(checkServiceDate(utcDate(2026, 10, 3), today).ok).toBe(false)
     expect(checkServiceDate(utcDate(2026, 10, 8), today).ok).toBe(false)
+  })
+})
+
+describe("nextStatus", () => {
+  it("steps First Timer → Second Timer → Regular and stops there", () => {
+    expect(nextStatus("First Timer")).toBe("Second Timer")
+    expect(nextStatus("Second Timer")).toBe("Regular, not done membership class")
+    expect(nextStatus("Regular, not done membership class")).toBeNull()
+    expect(nextStatus("Member")).toBeNull()
+    expect(nextStatus("Worker")).toBeNull()
   })
 })

@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { Check, CopyX, LoaderCircle, TriangleAlert, Upload } from "lucide-react"
-import { toast } from "sonner"
+import { toast } from "@/components/notifications"
+import { useActionMutation } from "@/hooks/use-action-mutation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -26,28 +26,19 @@ function formatDate(iso: string) {
 }
 
 export function AttendanceImport() {
-  const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
   const [sundayDate, setSundayDate] = useState("")
   const [preview, setPreview] = useState<Preview | null>(null)
   const [done, setDone] = useState<Done | null>(null)
   const [createNoPhone, setCreateNoPhone] = useState(false)
-  const [operation, setOperation] = useState<"preview" | "import" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [blockedDuplicate, setBlockedDuplicate] = useState<Duplicate | null>(null)
   const [allowDuplicate, setAllowDuplicate] = useState(false)
-  const [pending, start] = useTransition()
-  const busy = pending || operation !== null
   const fd = () => {
     const f = new FormData()
     f.set("file", file!)
     f.set("sundayDate", sundayDate)
     return f
-  }
-
-  function showError(message: string) {
-    setError(message)
-    toast.error(message)
   }
 
   function reset() {
@@ -58,52 +49,38 @@ export function AttendanceImport() {
     setAllowDuplicate(false)
   }
 
+  // Preview (read the file) and import both go through React Query mutations.
+  const previewMutation = useActionMutation((form: FormData) => previewAttendanceImport(form), {
+    refresh: false,
+    onSuccess: (result) => {
+      setPreview(result)
+      if (result.duplicate.blocked) toast.warning("This upload looks like a duplicate", { description: "Check the notice below before importing." })
+      else toast.info("Preview ready", { description: "Check the numbers, then press Import." })
+    },
+    onFailure: (r) => { setError(r.error) },
+  })
+  const importMutation = useActionMutation(
+    (v: { form: FormData; createNoPhone: boolean; allowDuplicate: boolean }) => commitAttendanceImport(v.form, v.createNoPhone, v.allowDuplicate),
+    {
+      success: (r) => ({ title: "Import finished", description: `${r.attendanceAdded} present marks added, ${r.membersAdded} new people.` }),
+      onSuccess: (result) => { setDone(result); setPreview(null); setAllowDuplicate(false) },
+      onFailure: (r) => {
+        if ("duplicate" in r && r.duplicate) setBlockedDuplicate(r.duplicate as Duplicate)
+        else setError(r.error)
+      },
+    },
+  )
+  const operation: "preview" | "import" | null = previewMutation.isPending ? "preview" : importMutation.isPending ? "import" : null
+  const busy = operation !== null
+
   function previewFile() {
     setError(null)
-    start(async () => {
-      setOperation("preview")
-      try {
-        const result = await previewAttendanceImport(fd())
-        if (!result.ok) {
-          showError(result.error)
-          return
-        }
-        setPreview(result)
-        if (result.duplicate.blocked) toast.warning("This upload looks like a duplicate")
-      } catch (reason) {
-        showError(reason instanceof Error ? reason.message : "Could not preview the file. Check your connection and try again.")
-      } finally {
-        setOperation(null)
-      }
-    })
+    previewMutation.mutate(fd())
   }
 
   function importFile() {
     setError(null)
-    start(async () => {
-      setOperation("import")
-      try {
-        const result = await commitAttendanceImport(fd(), createNoPhone, allowDuplicate)
-        if (!result.ok) {
-          if ("duplicate" in result && result.duplicate) {
-            setBlockedDuplicate(result.duplicate)
-            toast.error(result.error)
-            return
-          }
-          showError(result.error)
-          return
-        }
-        setDone(result)
-        setPreview(null)
-        setAllowDuplicate(false)
-        toast.success("Import finished")
-        router.refresh()
-      } catch (reason) {
-        showError(reason instanceof Error ? reason.message : "Import could not be completed. Check your connection and try again.")
-      } finally {
-        setOperation(null)
-      }
-    })
+    importMutation.mutate({ form: fd(), createNoPhone, allowDuplicate })
   }
 
   return (
@@ -203,7 +180,13 @@ export function AttendanceImport() {
       {done && (
         <Alert>
           <AlertDescription>
-            <p>Added {done.membersAdded} people, updated {done.membersUpdated}, added {done.servicesAdded} Sundays and {done.attendanceAdded} present marks. {done.rejected.length} rejected.</p>
+            <p>Added {done.membersAdded} people, updated {done.membersUpdated}, moved {done.membersPromoted} up a stage (First Timer → Second Timer → Regular), added {done.servicesAdded} Sundays and {done.attendanceAdded} present marks. {done.rejected.length} rejected.</p>
+            {done.headcount.created.length + done.headcount.refreshed.length > 0 && (
+              <p className="mt-1">Weekly headcount filled from this upload for {[...done.headcount.created, ...done.headcount.refreshed].map(formatDate).join(", ")}. Add children on <a className="underline" href={`/headcount?date=${done.headcount.created.at(-1) ?? done.headcount.refreshed.at(-1)}`}>Weekly headcount</a>.</p>
+            )}
+            {done.headcount.kept.length > 0 && (
+              <p className="mt-1">Headcount already entered by hand for {done.headcount.kept.map(formatDate).join(", ")}, so it was left as is. Use “Fill from register” there to update it.</p>
+            )}
             {done.membersNeedingConfirm.length > 0 && (
               <p className="mt-1">Not imported — these names match several phoneless records, so please confirm by hand: {done.membersNeedingConfirm.map((m) => `${m.name} (row ${m.row})`).join(", ")}.</p>
             )}

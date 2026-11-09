@@ -1,5 +1,6 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
+import { PendingContent } from "@/components/navigation"
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -60,13 +61,16 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardContent({ className, ...props }: React.ComponentProps<"div">) {
+function CardContent({ className, children, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-content"
       className={cn("px-6", className)}
       {...props}
-    />
+    >
+      {/* Shows a skeleton over the content while filters load new data. */}
+      <PendingContent>{children}</PendingContent>
+    </div>
   )
 }
 

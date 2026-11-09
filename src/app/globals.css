@@ -207,3 +207,8 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+@keyframes progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}

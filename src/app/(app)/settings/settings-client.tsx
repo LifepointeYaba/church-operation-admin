@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Check, Pencil, Trash2 } from "lucide-react"
-import { toast } from "sonner"
+import { useRunAction } from "@/hooks/use-action-mutation"
+import { useConfirm } from "@/components/confirm-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,15 +16,10 @@ import {
   addTeamAction, changePasswordAction, deleteTeamAction, renameTeamAction, saveStatusesAction, saveThresholdsAction,
 } from "./actions"
 
+/** Save/delete helper: React Query mutation with loading state and success/failure alerts. */
 function useAct() {
-  const router = useRouter()
-  const [pending, start] = useTransition()
-  const act = (fn: () => Promise<{ ok: boolean; error?: string }>, msg: string, after?: () => void) =>
-    start(async () => {
-      const r = await fn()
-      if (r.ok) { toast.success(msg); after?.(); router.refresh() } else toast.error(r.error)
-    })
-  return { pending, act }
+  const { run, isPending } = useRunAction()
+  return { pending: isPending, act: run }
 }
 
 export function ThresholdsForm({ initial }: { initial: AppSettings }) {
@@ -43,7 +39,7 @@ export function ThresholdsForm({ initial }: { initial: AppSettings }) {
           <Input id={k} inputMode="numeric" className="w-20 text-right" value={v[k]} onChange={(e) => setV({ ...v, [k]: e.target.value.replace(/\D/g, "") })} />
         </div>
       ))}
-      <Button disabled={pending}>Save</Button>
+      <Button loading={pending}>Save</Button>
     </form>
   )
 }
@@ -54,13 +50,14 @@ export function StatusesForm({ initial }: { initial: string[] }) {
   return (
     <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); act(() => saveStatusesAction(text.split("\n")), "Statuses saved") }}>
       <Textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} />
-      <Button disabled={pending}>Save</Button>
+      <Button loading={pending}>Save</Button>
     </form>
   )
 }
 
 export function TeamsManager({ teams }: { teams: { id: number; name: string; count: number }[] }) {
   const { pending, act } = useAct()
+  const confirm = useConfirm()
   const [editing, setEditing] = useState<number | null>(null)
   const [name, setName] = useState("")
   const [add, setAdd] = useState("")
@@ -68,7 +65,7 @@ export function TeamsManager({ teams }: { teams: { id: number; name: string; cou
     <div className="space-y-3">
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); act(() => addTeamAction(add), "Team added", () => setAdd("")) }}>
         <Input value={add} onChange={(e) => setAdd(e.target.value)} placeholder="New team name" />
-        <Button variant="secondary" disabled={pending || !add.trim()}>Add</Button>
+        <Button variant="secondary" loading={pending} disabled={!add.trim()}>Add</Button>
       </form>
       <ul className="max-h-[480px] divide-y overflow-y-auto text-sm">
         {teams.map((t) => (
@@ -76,7 +73,7 @@ export function TeamsManager({ teams }: { teams: { id: number; name: string; cou
             {editing === t.id ? (
               <form className="flex flex-1 gap-2" onSubmit={(e) => { e.preventDefault(); act(() => renameTeamAction(t.id, name), "Team updated", () => setEditing(null)) }}>
                 <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus className="h-8" />
-                <Button size="icon" variant="ghost" aria-label="Save"><Check className="size-4" /></Button>
+                <Button size="icon" variant="ghost" aria-label="Save" loading={pending}>{!pending && <Check className="size-4" />}</Button>
               </form>
             ) : (
               <span>{t.name} <span className="text-muted-foreground">· {t.count}</span></span>
@@ -84,7 +81,10 @@ export function TeamsManager({ teams }: { teams: { id: number; name: string; cou
             <span className="flex shrink-0">
               <Button size="icon" variant="ghost" aria-label={`Rename ${t.name}`} onClick={() => { setEditing(t.id); setName(t.name) }}><Pencil className="size-4" /></Button>
               <Button size="icon" variant="ghost" aria-label={`Delete ${t.name}`} disabled={pending}
-                onClick={() => confirm(`Delete “${t.name}”? ${t.count} people will lose this team.`) && act(() => deleteTeamAction(t.id), "Team deleted")}>
+                onClick={async () => {
+                  const ok = await confirm({ title: `Delete “${t.name}”?`, description: `${t.count} ${t.count === 1 ? "person" : "people"} will lose this team. This can’t be undone.`, confirmLabel: "Delete team", destructive: true })
+                  if (ok) act(() => deleteTeamAction(t.id), "Team deleted")
+                }}>
                 <Trash2 className="size-4" />
               </Button>
             </span>
@@ -107,7 +107,7 @@ export function PasswordForm() {
       <div className="space-y-1.5"><Label htmlFor="current">Current password</Label><Input id="current" name="current" type="password" autoComplete="current-password" required /></div>
       <div className="space-y-1.5"><Label htmlFor="next">New password</Label><Input id="next" name="next" type="password" minLength={10} autoComplete="new-password" required /></div>
       <div className="space-y-1.5"><Label htmlFor="confirm">Confirm new password</Label><Input id="confirm" name="confirm" type="password" minLength={10} autoComplete="new-password" required /></div>
-      <Button disabled={pending}>Change password</Button>
+      <Button loading={pending}>Change password</Button>
     </form>
   )
 }

@@ -1,4 +1,4 @@
-import Link from "next/link"
+import { NavLink } from "@/components/navigation"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { BREAKDOWN_ROWS, type Breakdown } from "@/lib/metrics/breakdown"
 import { formatDate } from "@/lib/dates"
@@ -31,10 +31,10 @@ export function SundayNumbers({ month, columns, selected, source, prevHref, next
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Attendance in {title}</p>
         <div className="flex gap-1">
           <Button variant="outline" size="icon" className="size-8" asChild={!!prevHref} disabled={!prevHref} aria-label="Previous month">
-            {prevHref ? <Link href={prevHref} scroll={false}><ChevronLeft className="size-4" /></Link> : <ChevronLeft className="size-4" />}
+            {prevHref ? <NavLink href={prevHref}><ChevronLeft className="size-4" /></NavLink> : <ChevronLeft className="size-4" />}
           </Button>
           <Button variant="outline" size="icon" className="size-8" asChild={!!nextHref} disabled={!nextHref} aria-label="Next month">
-            {nextHref ? <Link href={nextHref} scroll={false}><ChevronRight className="size-4" /></Link> : <ChevronRight className="size-4" />}
+            {nextHref ? <NavLink href={nextHref}><ChevronRight className="size-4" /></NavLink> : <ChevronRight className="size-4" />}
           </Button>
         </div>
       </div>
@@ -49,7 +49,7 @@ export function SundayNumbers({ month, columns, selected, source, prevHref, next
               </th>
               {columns.map((c) => (
                 <th key={c.date} scope="col" className={cn("px-3 py-2 text-right font-medium whitespace-nowrap", c.date === selected && "bg-primary/10 text-foreground")}>
-                  <Link href={hrefFor(c.date)} scroll={false} className="hover:underline">{formatDate(c.date)}</Link>
+                  <NavLink href={hrefFor(c.date)} className="hover:underline">{formatDate(c.date)}</NavLink>
                 </th>
               ))}
               <th scope="col" className="border-l px-3 py-2 text-right font-medium whitespace-nowrap">Average</th>

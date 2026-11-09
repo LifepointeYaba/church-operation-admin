@@ -1,16 +1,18 @@
-/** Shown while a page's data loads. */
+import { Skeleton } from "@/components/ui/skeleton"
+import { CardSkeleton, FilterBarSkeleton, PageLoading, StatCardsSkeleton } from "@/components/page-skeletons"
+
+/** Default loading screen (dashboard-shaped). Routes with a different layout have their own loading.tsx. */
 export default function Loading() {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Loading">
-      <div className="shimmer h-28 rounded-2xl" />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => <div key={i} className="shimmer h-28 rounded-xl" />)}
-      </div>
-      <div className="shimmer h-80 rounded-xl" />
+    <PageLoading label="dashboard">
+      <Skeleton className="h-36 rounded-2xl" />
+      <FilterBarSkeleton />
+      <StatCardsSkeleton />
+      <CardSkeleton lines={8} />
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="shimmer h-56 rounded-xl" />
-        <div className="shimmer h-56 rounded-xl" />
+        <CardSkeleton />
+        <CardSkeleton />
       </div>
-    </div>
+    </PageLoading>
   )
 }

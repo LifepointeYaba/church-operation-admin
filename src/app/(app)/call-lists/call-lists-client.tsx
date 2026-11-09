@@ -1,16 +1,15 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Check, Download, FileText, MessageSquarePlus, X } from "lucide-react"
-import { toast } from "sonner"
+import { useActionMutation } from "@/hooks/use-action-mutation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { NativeSelect } from "@/components/native-select"
+import { SelectField } from "@/components/select-field"
 import { EmptyState, StatusBadge } from "@/components/common"
 import { displayPhone } from "@/lib/phone"
 import { formatDate } from "@/lib/dates"
@@ -69,16 +68,15 @@ export function CallListTabs({ date, lists }: { date: string; lists: { key: stri
 type Suggestion = { id: number; memberId: number; name: string; phone: string | null; from: string; to: string; reason: string }
 
 export function SuggestionReview({ items, statuses }: { items: Suggestion[]; statuses: string[] }) {
-  const router = useRouter()
-  const [pending, start] = useTransition()
   const [choice, setChoice] = useState<Record<number, string>>({})
+  const m = useActionMutation(
+    (v: { s: Suggestion; approve: boolean }) => decideSuggestionAction(v.s.id, v.approve, choice[v.s.id] ?? v.s.to),
+    { success: (_r, v) => v.approve ? `${v.s.name}: status changed to ${choice[v.s.id] ?? v.s.to}` : `Suggestion for ${v.s.name} dismissed` },
+  )
   if (!items.length) return <EmptyState title="No suggestions waiting" />
-  const decide = (s: Suggestion, approve: boolean) =>
-    start(async () => {
-      await decideSuggestionAction(s.id, approve, choice[s.id] ?? s.to)
-      toast.success(approve ? `${s.name}: status updated` : "Suggestion dismissed")
-      router.refresh()
-    })
+  const pending = m.isPending
+  const busy = (s: Suggestion, approve: boolean) => m.isPending && m.variables?.s.id === s.id && m.variables.approve === approve
+  const decide = (s: Suggestion, approve: boolean) => m.mutate({ s, approve })
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table>
@@ -89,14 +87,14 @@ export function SuggestionReview({ items, statuses }: { items: Suggestion[]; sta
               <TableCell><Link href={`/members/${s.memberId}`} className="font-medium hover:underline">{s.name}</Link><div className="text-xs text-muted-foreground">{displayPhone(s.phone)}</div></TableCell>
               <TableCell><StatusBadge status={s.from} /></TableCell>
               <TableCell>
-                <NativeSelect aria-label="New status" value={choice[s.id] ?? s.to} onChange={(e) => setChoice({ ...choice, [s.id]: e.target.value })}>
+                <SelectField aria-label="New status" value={choice[s.id] ?? s.to} onChange={(e) => setChoice({ ...choice, [s.id]: e.target.value })}>
                   {statuses.map((st) => <option key={st}>{st}</option>)}
-                </NativeSelect>
+                </SelectField>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">{s.reason}</TableCell>
               <TableCell className="whitespace-nowrap text-right">
-                <Button size="sm" disabled={pending} onClick={() => decide(s, true)}><Check className="size-4" /> Approve</Button>{" "}
-                <Button size="sm" variant="ghost" disabled={pending} onClick={() => decide(s, false)}><X className="size-4" /> Dismiss</Button>
+                <Button size="sm" loading={busy(s, true)} disabled={pending} onClick={() => decide(s, true)}>{!busy(s, true) && <Check className="size-4" />} Approve</Button>{" "}
+                <Button size="sm" variant="ghost" loading={busy(s, false)} disabled={pending} onClick={() => decide(s, false)}>{!busy(s, false) && <X className="size-4" />} Dismiss</Button>
               </TableCell>
             </TableRow>
           ))}

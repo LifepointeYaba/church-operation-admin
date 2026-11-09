@@ -59,6 +59,9 @@ async function _registerBreakdown(fromIso: string, toIso: string, f: Filters): P
   )
 }
 
+/** Uncached version, for writes that need numbers straight after an import. */
+export const registerBreakdownNow = _registerBreakdown
+
 export const registerBreakdown = unstable_cache(_registerBreakdown, ["register-breakdown"], { tags: [METRICS_TAG], revalidate: 3600 })
 
 export async function notesBetween(fromIso: string, toIso: string) {
