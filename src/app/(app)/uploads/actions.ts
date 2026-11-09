@@ -12,6 +12,9 @@ import { getSettings } from "@/lib/settings"
 import type { Prisma } from "@prisma/client"
 import type { ParsedPerson } from "@/lib/import/attendance"
 import { matchAttendancePerson } from "@/lib/import/matching"
+import { nameKey as makeNameKey } from "@/lib/keys"
+import { normalizePhone } from "@/lib/phone"
+import { createHash } from "node:crypto"
 
 async function read(form: FormData) {
   const file = form.get("file")
@@ -26,10 +29,47 @@ async function read(form: FormData) {
   }
 }
 
+type ParsedAttendance = Awaited<ReturnType<typeof read>>["parsed"]
+
+/**
+ * Detects a re-upload: either the exact same file was imported before, or every Sunday in
+ * the file already has attendance recorded. Multi-Sunday sheets that add at least one new
+ * Sunday are allowed through (re-importing them only merges), but report the overlap.
+ */
+async function findDuplicateUpload(fileHash: string, parsed: ParsedAttendance) {
+  const dates = [...new Set(parsed.services.map((s) => s.date))].sort()
+  const [sameFile, recorded] = await Promise.all([
+    prisma.upload.findFirst({
+      where: { kind: "attendance", summary: { path: ["fileHash"], equals: fileHash } },
+      orderBy: { uploadedAt: "desc" },
+      select: { id: true, fileName: true, uploadedAt: true },
+    }),
+    dates.length
+      ? prisma.service.findMany({
+        where: { date: { in: dates.map((d) => new Date(`${d}T00:00:00.000Z`)) }, attendance: { some: {} } },
+        select: { date: true },
+      })
+      : Promise.resolve([]),
+  ])
+  const alreadyRecorded = recorded.map((s) => s.date.toISOString().slice(0, 10)).sort()
+  const allWeeksRecorded = dates.length > 0 && alreadyRecorded.length === dates.length
+  return {
+    blocked: Boolean(sameFile) || allWeeksRecorded,
+    sameFile: sameFile ? { id: sameFile.id, fileName: sameFile.fileName, uploadedAt: sameFile.uploadedAt.toISOString() } : null,
+    alreadyRecorded,
+    allWeeksRecorded,
+  }
+}
+
+function hashFile(buf: Buffer) {
+  return createHash("sha256").update(buf).digest("hex")
+}
+
 export async function previewAttendanceImport(form: FormData) {
   await requireAdmin()
   try {
-    const { parsed } = await read(form)
+    const { buf, parsed } = await read(form)
+    const duplicate = await findDuplicateUpload(hashFile(buf), parsed)
     const existing = await prisma.member.findMany({
       where: { deletedAt: null },
       select: { id: true, nameKey: true, phoneKey: true, email: true },
@@ -53,18 +93,33 @@ export async function previewAttendanceImport(form: FormData) {
       marks: parsed.people.reduce((a, p) => a + p.present.length, 0),
       rejectedColumns: parsed.rejectedColumns,
       rejectedRows: parsed.rejectedRows,
+      duplicate,
     }
   } catch (e) {
     return { ok: false as const, error: e instanceof Error ? e.message : "Could not read the file" }
   }
 }
 
-export async function commitAttendanceImport(form: FormData, createUnmatchedNoPhone: boolean) {
+export async function commitAttendanceImport(form: FormData, createUnmatchedNoPhone: boolean, allowDuplicate = false) {
   await requireAdmin()
+  let uploadId: number | null = null
   try {
     const { file, buf, parsed } = await read(form)
+    const fileHash = hashFile(buf)
+    const duplicate = await findDuplicateUpload(fileHash, parsed)
+    if (duplicate.blocked && !allowDuplicate) {
+      return {
+        ok: false as const,
+        error: duplicate.sameFile
+          ? `This exact file was already imported as “${duplicate.sameFile.fileName}”.`
+          : `Attendance for ${duplicate.alreadyRecorded.join(", ")} has already been uploaded.`,
+        duplicate,
+      }
+    }
+    const serviceDates = [...new Set(parsed.services.map((s) => s.date))].sort()
     const blobUrl = await storeFile("attendance", file.name, buf, file.type)
     const upload = await prisma.upload.create({ data: { kind: "attendance", fileName: file.name, blobUrl, status: "processing" } })
+    uploadId = upload.id
     const sum = await applyAttendanceImport(prisma, parsed, { createUnmatchedNoPhone })
     await prisma.upload.update({
       where: { id: upload.id },
@@ -72,14 +127,19 @@ export async function commitAttendanceImport(form: FormData, createUnmatchedNoPh
         rowsOk: parsed.people.length - sum.membersNeedingConfirm.length - sum.membersPendingApproval.length,
         rowsFailed: sum.rejected.length + sum.membersNeedingConfirm.length,
         status: sum.membersPendingApproval.length || sum.membersNeedingConfirm.length ? "needs review" : "completed",
-        summary: sum,
+        summary: { ...sum, fileHash, serviceDates, reimport: duplicate.blocked },
       },
     })
-    await audit("import", "upload", upload.id, null, sum)
+    await audit("import", "upload", upload.id, null, { ...sum, reimport: duplicate.blocked })
     refreshData()
     return { ok: true as const, ...sum }
   } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : "Import failed" }
+    const error = e instanceof Error ? e.message : "Import failed"
+    if (uploadId !== null) {
+      await prisma.upload.update({ where: { id: uploadId }, data: { status: "failed", summary: { error } } }).catch(() => {})
+      refreshData()
+    }
+    return { ok: false as const, error }
   }
 }
 
@@ -135,11 +195,68 @@ function pendingPerson(value: Prisma.JsonValue | undefined, row: number): Parsed
   }
 }
 
+export async function searchPendingAttendanceMembers(uploadId: number, row: number, query: string) {
+  await requireAdmin()
+  try {
+    if (!Number.isSafeInteger(uploadId) || uploadId < 1 || !Number.isSafeInteger(row) || row < 2) {
+      throw new Error("Invalid upload or row")
+    }
+    const upload = await prisma.upload.findUnique({ where: { id: uploadId }, select: { kind: true, summary: true } })
+    if (!upload || upload.kind !== "attendance") throw new Error("Attendance upload not found")
+    const summary = jsonObject(upload.summary)
+    const pending = summary?.membersPendingApproval
+    const candidate = Array.isArray(pending)
+      ? pendingPerson(pending.find((item) => jsonObject(item)?.row === row), row)
+      : null
+    if (!candidate) throw new Error("Pending member could not be found; refresh and try again")
+
+    const term = query.trim()
+    if (term.length < 2) throw new Error("Enter at least 2 characters to search")
+    const normalizedPhone = normalizePhone(term).phoneKey
+    const digits = term.replace(/\D/g, "")
+    const phoneSearch = digits.startsWith("0")
+      ? `+234${digits.slice(1)}`
+      : digits.startsWith("234")
+        ? `+${digits}`
+        : /^[789]/.test(digits)
+          ? `+234${digits}`
+          : null
+    const terms = term.split(/\s+/).filter(Boolean)
+    const where: Prisma.MemberWhereInput = {
+      deletedAt: null,
+      OR: [
+        { phone: { contains: term } },
+        ...(phoneSearch ? [{ phoneKey: { contains: phoneSearch } }] : []),
+        ...(normalizedPhone ? [{ phoneKey: normalizedPhone }] : []),
+        { email: { contains: term, mode: "insensitive" } },
+        {
+          AND: terms.map((word) => ({
+            OR: [
+              { firstName: { contains: word, mode: "insensitive" } },
+              { lastName: { contains: word, mode: "insensitive" } },
+            ],
+          })),
+        },
+      ],
+    }
+    const members = await prisma.member.findMany({
+      where,
+      select: { id: true, firstName: true, lastName: true, phone: true, altPhone: true, email: true, gender: true, status: true },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+      take: 10,
+    })
+    return { ok: true as const, members }
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Could not search members" }
+  }
+}
+
 export async function resolvePendingAttendanceImport(
   uploadId: number,
   row: number,
   decision: "approve" | "reject",
   status = "Member",
+  selectedMemberId?: number,
 ) {
   await requireAdmin()
   try {
@@ -147,6 +264,9 @@ export async function resolvePendingAttendanceImport(
       throw new Error("Invalid upload or row")
     }
     if (decision !== "approve" && decision !== "reject") throw new Error("Invalid review decision")
+    if (selectedMemberId !== undefined && (!Number.isSafeInteger(selectedMemberId) || selectedMemberId < 1)) {
+      throw new Error("Invalid selected member")
+    }
     const upload = await prisma.upload.findUnique({ where: { id: uploadId } })
     if (!upload || upload.kind !== "attendance") throw new Error("Attendance upload not found")
     const summary = jsonObject(upload.summary)
@@ -159,19 +279,34 @@ export async function resolvePendingAttendanceImport(
     if (!candidate) throw new Error("Pending member could not be found; refresh and try again")
 
     let approvedMemberCreated = false
+    let approvedMemberUpdated = false
     let approvedMarksAdded = 0
     if (decision === "approve") {
       const settings = await getSettings()
-      if (!settings.statuses.includes(status)) throw new Error("Choose a valid member status")
+      if (selectedMemberId === undefined && !settings.statuses.includes(status)) throw new Error("Choose a valid member status")
       const updatedCandidate = { ...candidate, status }
-      const { member, created, marksAdded } = await prisma.$transaction(async (tx) => {
-        const registered = await tx.member.findMany({
-          where: { deletedAt: null },
-          select: { id: true, nameKey: true, phoneKey: true, email: true },
-        })
-        const match = matchAttendancePerson(updatedCandidate, registered)
-        if (match.kind === "ambiguous") throw new Error("Contact details now match multiple registered people; please resolve the match before approving")
-        const existing = match.kind === "matched" ? match.member : null
+      const { member, created, updated, marksAdded } = await prisma.$transaction(async (tx) => {
+        let existing: { id: number; firstName: string; lastName: string; nameKey: string; phone: string | null; phoneKey: string | null; altPhone: string | null; email: string | null; gender: string | null; personResponsible: string | null } | null = null
+        if (selectedMemberId !== undefined) {
+          existing = await tx.member.findFirst({
+            where: { id: selectedMemberId, deletedAt: null },
+            select: { id: true, firstName: true, lastName: true, nameKey: true, phone: true, phoneKey: true, altPhone: true, email: true, gender: true, personResponsible: true },
+          })
+          if (!existing) throw new Error("Selected member is no longer available")
+        } else {
+          const registered = await tx.member.findMany({
+            where: { deletedAt: null },
+            select: { id: true, nameKey: true, phoneKey: true, email: true },
+          })
+          const match = matchAttendancePerson(updatedCandidate, registered)
+          if (match.kind === "ambiguous") throw new Error("Contact details now match multiple registered people; please resolve the match before approving")
+          if (match.kind === "matched") {
+            existing = await tx.member.findUnique({
+              where: { id: match.member.id },
+              select: { id: true, firstName: true, lastName: true, nameKey: true, phone: true, phoneKey: true, altPhone: true, email: true, gender: true, personResponsible: true },
+            })
+          }
+        }
         const saved = existing ?? await tx.member.create({
           data: {
             firstName: updatedCandidate.firstName,
@@ -187,7 +322,27 @@ export async function resolvePendingAttendanceImport(
           },
           select: { id: true },
         })
-        if (!existing) {
+        let updated = false
+        if (existing) {
+          const data: Prisma.MemberUpdateInput = {}
+          if (!existing.email && updatedCandidate.email) data.email = updatedCandidate.email
+          if (!existing.gender && updatedCandidate.gender) data.gender = updatedCandidate.gender
+          if (!existing.personResponsible && updatedCandidate.personResponsible) data.personResponsible = updatedCandidate.personResponsible
+          if (!existing.phone && updatedCandidate.phone) {
+            data.phone = updatedCandidate.phone
+            data.phoneKey = updatedCandidate.phoneKey
+          } else if (existing.phone && updatedCandidate.phone && !existing.altPhone && existing.phoneKey !== updatedCandidate.phoneKey) {
+            data.altPhone = updatedCandidate.phone
+          }
+          if (!existing.lastName && updatedCandidate.lastName) {
+            data.lastName = updatedCandidate.lastName
+            data.nameKey = makeNameKey(existing.firstName, updatedCandidate.lastName)
+          }
+          if (Object.keys(data).length) {
+            await tx.member.update({ where: { id: existing.id }, data })
+            updated = true
+          }
+        } else {
           await tx.statusHistory.create({
             data: { memberId: saved.id, old: null, new: updatedCandidate.status, reason: "Approved from weekly attendance import" },
           })
@@ -202,9 +357,10 @@ export async function resolvePendingAttendanceImport(
           })
           marksAdded += result.count
         }
-        return { member: saved, created: !existing, marksAdded }
+        return { member: saved, created: !existing, updated, marksAdded }
       })
       approvedMemberCreated = created
+      approvedMemberUpdated = updated
       approvedMarksAdded = marksAdded
       await refreshDerivedMemberData(prisma)
       await audit("import_approve", "member", member.id, null, { uploadId, row })
@@ -220,6 +376,7 @@ export async function resolvePendingAttendanceImport(
         ? { rejected: [...(Array.isArray(summary.rejected) ? summary.rejected : []), { row, reason: "Rejected during review" }] }
         : {
           membersAdded: Number(summary.membersAdded ?? 0) + (approvedMemberCreated ? 1 : 0),
+          membersUpdated: Number(summary.membersUpdated ?? 0) + (approvedMemberUpdated ? 1 : 0),
           attendanceAdded: Number(summary.attendanceAdded ?? 0) + approvedMarksAdded,
           }),
     }

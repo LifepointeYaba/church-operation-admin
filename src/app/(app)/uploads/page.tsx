@@ -33,7 +33,13 @@ export default async function UploadsPage() {
       if (!person || typeof person !== "object" || Array.isArray(person)) return []
       const details = person as Prisma.JsonObject
       if (typeof entry.row !== "number" || typeof details.firstName !== "string" || typeof details.lastName !== "string") return []
-      return [{ row: entry.row, name: `${details.firstName} ${details.lastName}`.trim() }]
+      return [{
+        row: entry.row,
+        name: `${details.firstName} ${details.lastName}`.trim(),
+        phone: typeof details.phone === "string" ? details.phone : null,
+        email: typeof details.email === "string" ? details.email : null,
+        gender: typeof details.gender === "string" ? details.gender : null,
+      }]
     })
     return people.length ? [{ id: upload.id, fileName: upload.fileName, people }] : []
   })
@@ -54,7 +60,7 @@ export default async function UploadsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Pending member approvals</CardTitle>
-            <CardDescription>These attendees were marked First Time = No but did not match a registered person. Approve to create a member and record attendance, or reject to leave them out.</CardDescription>
+            <CardDescription>These attendees were marked First Time = No but did not match a registered person. Search existing members by name, phone, or email to link the attendance and fill blank profile details, or create a new record or reject the row.</CardDescription>
           </CardHeader>
           <CardContent><PendingAttendanceReviews uploads={pendingUploads} statuses={settings.statuses} /></CardContent>
         </Card>
@@ -78,7 +84,7 @@ export default async function UploadsPage() {
                     <TableCell className="max-w-64 truncate">{u.fileName}</TableCell>
                     <TableCell className="text-right tabular-nums">{u.rowsOk}</TableCell>
                     <TableCell className="text-right tabular-nums">{u.rowsFailed}</TableCell>
-                    <TableCell><Badge variant={u.status === "completed" ? "secondary" : "outline"}>{u.status}</Badge></TableCell>
+                    <TableCell><Badge variant={u.status === "completed" ? "secondary" : u.status === "failed" ? "destructive" : "outline"}>{u.status}</Badge></TableCell>
                     <TableCell className="pr-6 text-right">
                       {u.blobUrl && <Button size="sm" variant="ghost" asChild><a href={`/api/uploads/${u.id}`}><Download className="size-4" /> Original</a></Button>}
                     </TableCell>

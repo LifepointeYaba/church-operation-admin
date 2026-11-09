@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { Upload } from "lucide-react"
+import { Check, CopyX, LoaderCircle, TriangleAlert, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,18 @@ import { commitAttendanceImport, previewAttendanceImport } from "./actions"
 
 type Preview = Extract<Awaited<ReturnType<typeof previewAttendanceImport>>, { ok: true }>
 type Done = Extract<Awaited<ReturnType<typeof commitAttendanceImport>>, { ok: true }>
+type Duplicate = Preview["duplicate"]
+
+const STEPS = {
+  preview: ["Uploading file", "Reading rows and columns", "Checking for previous uploads", "Matching people to members"],
+  import: ["Uploading file", "Checking for previous uploads", "Saving a copy of the file", "Matching and saving people", "Recording attendance", "Updating member records"],
+} as const
+const STEP_MS = { preview: 1200, import: 2500 }
+const SLOW_AFTER_S = { preview: 20, import: 45 }
+
+function formatDate(iso: string) {
+  return new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString("en-GB", { timeZone: "Africa/Lagos", dateStyle: "medium" })
+}
 
 export function AttendanceImport() {
   const router = useRouter()
@@ -20,29 +32,116 @@ export function AttendanceImport() {
   const [preview, setPreview] = useState<Preview | null>(null)
   const [done, setDone] = useState<Done | null>(null)
   const [createNoPhone, setCreateNoPhone] = useState(false)
+  const [operation, setOperation] = useState<"preview" | "import" | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [blockedDuplicate, setBlockedDuplicate] = useState<Duplicate | null>(null)
+  const [allowDuplicate, setAllowDuplicate] = useState(false)
   const [pending, start] = useTransition()
+  const busy = pending || operation !== null
   const fd = () => {
     const f = new FormData()
     f.set("file", file!)
     f.set("sundayDate", sundayDate)
     return f
   }
+
+  function showError(message: string) {
+    setError(message)
+    toast.error(message)
+  }
+
+  function reset() {
+    setPreview(null)
+    setDone(null)
+    setError(null)
+    setBlockedDuplicate(null)
+    setAllowDuplicate(false)
+  }
+
+  function previewFile() {
+    setError(null)
+    start(async () => {
+      setOperation("preview")
+      try {
+        const result = await previewAttendanceImport(fd())
+        if (!result.ok) {
+          showError(result.error)
+          return
+        }
+        setPreview(result)
+        if (result.duplicate.blocked) toast.warning("This upload looks like a duplicate")
+      } catch (reason) {
+        showError(reason instanceof Error ? reason.message : "Could not preview the file. Check your connection and try again.")
+      } finally {
+        setOperation(null)
+      }
+    })
+  }
+
+  function importFile() {
+    setError(null)
+    start(async () => {
+      setOperation("import")
+      try {
+        const result = await commitAttendanceImport(fd(), createNoPhone, allowDuplicate)
+        if (!result.ok) {
+          if ("duplicate" in result && result.duplicate) {
+            setBlockedDuplicate(result.duplicate)
+            toast.error(result.error)
+            return
+          }
+          showError(result.error)
+          return
+        }
+        setDone(result)
+        setPreview(null)
+        setAllowDuplicate(false)
+        toast.success("Import finished")
+        router.refresh()
+      } catch (reason) {
+        showError(reason instanceof Error ? reason.message : "Import could not be completed. Check your connection and try again.")
+      } finally {
+        setOperation(null)
+      }
+    })
+  }
+
   return (
     <div className="stagger space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setPreview(null); setDone(null) }} />
-        <Button variant="secondary" disabled={!file || pending} onClick={() => start(async () => {
-          const r = await previewAttendanceImport(fd())
-          if (!r.ok) { toast.error(r.error); return }
-          setPreview(r)
-        })}><Upload className="size-4" /> Preview</Button>
+        <Input type="file" accept=".csv,.xlsx,.xls" disabled={busy} onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset() }} />
+        <Button variant="secondary" disabled={!file || busy} onClick={previewFile}>
+          {operation === "preview" ? <LoaderCircle className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {operation === "preview" ? "Reading file…" : "Preview"}
+        </Button>
       </div>
       <div className="max-w-xs space-y-1">
         <label htmlFor="weekly-sunday-date" className="text-sm font-medium">Sunday date for weekly files</label>
-        <Input id="weekly-sunday-date" type="date" value={sundayDate} onChange={(e) => { setSundayDate(e.target.value); setPreview(null); setDone(null) }} />
+        <Input id="weekly-sunday-date" type="date" value={sundayDate} disabled={busy} onChange={(e) => { setSundayDate(e.target.value); reset() }} />
       </div>
+      {operation && <ImportProgress operation={operation} file={file} />}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>
+            <p className="font-medium">The file could not be processed</p>
+            <p>{error}</p>
+            <p>Check that the file is valid and your connection is working, then try Preview or select the file again.</p>
+          </AlertDescription>
+        </Alert>
+      )}
+      {blockedDuplicate && !preview && <DuplicateNotice duplicate={blockedDuplicate} />}
       {preview && (
         <div className="space-y-3 rounded-lg border p-4 text-sm">
+          {preview.duplicate.blocked
+            ? <DuplicateNotice duplicate={preview.duplicate} />
+            : preview.duplicate.alreadyRecorded.length > 0 && (
+              <Alert>
+                <AlertDescription>
+                  <p className="font-medium">Some Sundays in this file were uploaded before</p>
+                  <p>{preview.duplicate.alreadyRecorded.map(formatDate).join(", ")} already have attendance. Those Sundays will be merged, not duplicated; only the new Sundays add fresh records.</p>
+                </AlertDescription>
+              </Alert>
+            )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="People in file" v={preview.people} />
             <Stat label="Already registered" v={preview.matched} />
@@ -89,14 +188,16 @@ export function AttendanceImport() {
             <Checkbox checked={createNoPhone} onCheckedChange={(c) => setCreateNoPhone(!!c)} />
             Create new records for people without a phone whose name matches more than one existing record
           </label>
-          <Button disabled={pending} onClick={() => start(async () => {
-            const r = await commitAttendanceImport(fd(), createNoPhone)
-            if (!r.ok) { toast.error(r.error); return }
-            setDone(r)
-            setPreview(null)
-            toast.success("Import finished")
-            router.refresh()
-          })}>{pending ? "Importing…" : "Import"}</Button>
+          {preview.duplicate.blocked && (
+            <label className="flex items-center gap-2 font-medium text-destructive">
+              <Checkbox checked={allowDuplicate} onCheckedChange={(c) => setAllowDuplicate(!!c)} />
+              I understand this was uploaded before and want to import it again anyway (for corrections)
+            </label>
+          )}
+          <Button disabled={busy || (preview.duplicate.blocked && !allowDuplicate)} onClick={importFile}>
+            {operation === "import" && <LoaderCircle className="size-4 animate-spin" />}
+            {operation === "import" ? "Importing…" : "Import"}
+          </Button>
         </div>
       )}
       {done && (
@@ -110,6 +211,79 @@ export function AttendanceImport() {
         </Alert>
       )}
     </div>
+  )
+}
+
+function ImportProgress({ operation, file }: { operation: "preview" | "import"; file: File | null }) {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const started = Date.now()
+    const id = setInterval(() => setElapsed(Date.now() - started), 250)
+    return () => clearInterval(id)
+  }, [operation])
+  const steps = STEPS[operation]
+  // Steps advance on a timer because the server works in one request; the last step holds until it replies.
+  const active = Math.min(Math.floor(elapsed / STEP_MS[operation]), steps.length - 1)
+  const seconds = Math.floor(elapsed / 1000)
+  const slow = seconds >= SLOW_AFTER_S[operation]
+  const percent = Math.min(95, Math.round((1 - Math.exp(-elapsed / (STEP_MS[operation] * steps.length))) * 100))
+
+  return (
+    <div role="status" aria-live="polite" className="animate-fade-up space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+      <div className="flex items-center gap-3">
+        <span className="relative flex size-5 shrink-0 items-center justify-center">
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/30" />
+          <LoaderCircle className="relative size-5 animate-spin text-primary" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{operation === "import" ? "Import in progress" : "Preparing preview"}</p>
+          <p className="truncate text-sm text-muted-foreground">{steps[active]}…</p>
+        </div>
+        <span className="text-sm tabular-nums text-muted-foreground">{seconds}s</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-primary/15">
+        <div className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out" style={{ width: `${percent}%` }} />
+      </div>
+      <ol className="grid gap-1.5 text-sm sm:grid-cols-2">
+        {steps.map((step, i) => (
+          <li key={step} className={`flex items-center gap-2 transition-colors ${i > active ? "text-muted-foreground/60" : i === active ? "font-medium" : "text-muted-foreground"}`}>
+            {i < active
+              ? <Check className="size-4 shrink-0 text-primary" />
+              : i === active
+                ? <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" />
+                : <span className="mx-1 size-2 shrink-0 rounded-full bg-muted-foreground/30" />}
+            {step}
+          </li>
+        ))}
+      </ol>
+      {file && <p className="text-xs text-muted-foreground">{file.name} · {(file.size / 1024).toFixed(0)} KB</p>}
+      {slow ? (
+        <p className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          This is taking longer than usual. Large files or a slow connection can cause this — keep this page open. If nothing happens after a few minutes, check the upload history below before trying again.
+        </p>
+      ) : operation === "import" && (
+        <p className="text-xs text-muted-foreground">Please keep this page open until the import finishes.</p>
+      )}
+    </div>
+  )
+}
+
+function DuplicateNotice({ duplicate }: { duplicate: Duplicate }) {
+  return (
+    <Alert variant="destructive">
+      <CopyX className="size-4" />
+      <AlertDescription>
+        <p className="font-medium">This attendance has already been uploaded</p>
+        {duplicate.sameFile && (
+          <p>This exact file was imported as “{duplicate.sameFile.fileName}” on {formatDate(duplicate.sameFile.uploadedAt)}.</p>
+        )}
+        {duplicate.allWeeksRecorded && (
+          <p>Attendance already exists for {duplicate.alreadyRecorded.map(formatDate).join(", ")}.</p>
+        )}
+        <p>Importing again is blocked to avoid re-uploading the same week. Check the Sunday date and file, or see the upload history below.</p>
+      </AlertDescription>
+    </Alert>
   )
 }
 
