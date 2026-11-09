@@ -128,6 +128,8 @@ model ServiceHeadcount {
   uploadId      Int?     @map("upload_id")
   version       Int      @default(1)
   isCurrent     Boolean  @default(true) @map("is_current")
+  /// Kept in step with the attendance register (filled from an upload or from marking attendance).
+  fromRegister  Boolean  @default(false) @map("from_register")
   createdAt     DateTime @default(now()) @map("created_at")
   service       Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   upload        Upload?  @relation(fields: [uploadId], references: [id], onDelete: SetNull)

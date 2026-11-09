@@ -7,7 +7,7 @@ import { refreshData } from "@/lib/revalidate"
 import { fromIso, isoDate } from "@/lib/dates"
 import { noteType, validateHeadcount, type HeadcountValues } from "@/lib/import/headcount"
 import { applyHeadcounts } from "@/lib/import/apply"
-import { REGISTER_FIELDS } from "@/lib/headcount-sync"
+import { REGISTER_FIELDS, followsRegister } from "@/lib/headcount-sync"
 
 async function existingDates(dates: string[]) {
   const rows = await prisma.serviceHeadcount.findMany({
@@ -25,9 +25,9 @@ export async function saveHeadcountAction(dateIso: string, values: HeadcountValu
   if (errors.length) return { ok: false as const, error: errors.join("; ") }
   const existing = (await existingDates([dateIso])).get(dateIso)
   const lines = notes.split("\n").map((l) => l.trim()).filter(Boolean)
-  // Only children (or nothing) changed on a Sunday filled from an upload: update it in place so
-  // later uploads for the same Sunday can still refresh the register numbers.
-  if (existing?.upload?.kind === "attendance" && REGISTER_FIELDS.every((k) => existing[k] === v[k])) {
+  // Only children (or nothing) changed on a Sunday that follows the register: update it in place so
+  // later uploads and attendance marks for the same Sunday can still refresh the register numbers.
+  if (existing && followsRegister(existing) && REGISTER_FIELDS.every((k) => existing[k] === v[k])) {
     await prisma.serviceHeadcount.update({ where: { id: existing.id }, data: { children: v.children } })
     for (const text of lines) await prisma.serviceNote.create({ data: { serviceId: existing.serviceId, type: noteType(text), text } })
     await audit("headcount_children", "service", dateIso, { children: existing.children }, { children: v.children })

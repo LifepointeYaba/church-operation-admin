@@ -22,7 +22,7 @@ export const BREAKDOWN_ROWS: { key: keyof Breakdown; label: string; strong?: boo
 
 /**
  * The same breakdown worked out from the attendance register, so it can be filtered by team and gender.
- * First/second timers = first/second recorded visit that Sunday; workers = status Worker; members = everyone else present.
+ * Workers = status Worker (always); first/second timers = anyone else on their first/second recorded visit; members = everyone else present.
  */
 async function _registerBreakdown(fromIso: string, toIso: string, f: Filters): Promise<Record<string, Breakdown>> {
   const from = new Date(`${fromIso}T00:00:00Z`)
@@ -36,9 +36,9 @@ async function _registerBreakdown(fromIso: string, toIso: string, f: Filters): P
     )
     SELECT v.date,
       COUNT(*)::int AS total,
-      (COUNT(*) FILTER (WHERE v.ord = 1))::int AS first_timers,
-      (COUNT(*) FILTER (WHERE v.ord = 2))::int AS second_timers,
-      (COUNT(*) FILTER (WHERE v.ord > 2 AND m.status = 'Worker'))::int AS workers,
+      (COUNT(*) FILTER (WHERE m.status = 'Worker'))::int AS workers,
+      (COUNT(*) FILTER (WHERE v.ord = 1 AND m.status IS DISTINCT FROM 'Worker'))::int AS first_timers,
+      (COUNT(*) FILTER (WHERE v.ord = 2 AND m.status IS DISTINCT FROM 'Worker'))::int AS second_timers,
       (COUNT(*) FILTER (WHERE m.gender = 'Male'))::int AS male,
       (COUNT(*) FILTER (WHERE m.gender = 'Female'))::int AS female
     FROM visits v JOIN members m ON m.id = v.member_id

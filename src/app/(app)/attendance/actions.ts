@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db"
 import { audit } from "@/lib/audit"
 import { refreshData } from "@/lib/revalidate"
 import { checkServiceDate, fromIso, isoDate } from "@/lib/dates"
+import { syncHeadcountsForMark } from "@/lib/headcount-sync"
 
 export async function ensureServiceAction(dateIso: string) {
   await requireAdmin()
@@ -19,16 +20,19 @@ export async function ensureServiceAction(dateIso: string) {
 export async function toggleAttendanceAction(serviceId: number, memberId: number, present: boolean) {
   await requireAdmin()
   const svc = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } })
-  if (present) {
-    await prisma.attendance.upsert({
-      where: { memberId_serviceId: { memberId, serviceId } },
-      create: { memberId, serviceId },
-      update: {},
-    })
-    if (!svc.recordTaken) await prisma.service.update({ where: { id: serviceId }, data: { recordTaken: true } })
-  } else {
-    await prisma.attendance.deleteMany({ where: { memberId, serviceId } })
-  }
+  // Update the register, and the weekly headcount (worker/member/first/second timer, male/female, total) with it.
+  await syncHeadcountsForMark(prisma, memberId, isoDate(svc.date), async () => {
+    if (present) {
+      await prisma.attendance.upsert({
+        where: { memberId_serviceId: { memberId, serviceId } },
+        create: { memberId, serviceId },
+        update: {},
+      })
+      if (!svc.recordTaken) await prisma.service.update({ where: { id: serviceId }, data: { recordTaken: true } })
+    } else {
+      await prisma.attendance.deleteMany({ where: { memberId, serviceId } })
+    }
+  })
   await audit(present ? "attendance_mark" : "attendance_unmark", "member", memberId, null, { date: isoDate(svc.date) })
   await prisma.$executeRaw`
     UPDATE members SET first_seen_service_id = (

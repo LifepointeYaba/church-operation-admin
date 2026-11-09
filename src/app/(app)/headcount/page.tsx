@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { formatDate, isoDate, lastSunday } from "@/lib/dates"
 import { registerBreakdown } from "@/lib/metrics/breakdown"
+import { followsRegister } from "@/lib/headcount-sync"
 import { cn } from "@/lib/utils"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -24,10 +25,10 @@ const NUM_LABELS: Record<NumField, string> = {
   total: "Total", male: "Male", female: "Female", children: "Children",
 }
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-const SOURCE_LABEL: Record<HeadcountSource, string> = { upload: "From upload", manual: "Entered by hand", chart: "Chart sheet" }
+const SOURCE_LABEL: Record<HeadcountSource, string> = { upload: "From attendance", manual: "Entered by hand", chart: "Chart sheet" }
 
-function sourceOf(h: { uploadId: number | null; upload: { kind: string } | null }): HeadcountSource {
-  if (h.upload?.kind === "attendance") return "upload"
+function sourceOf(h: { uploadId: number | null; fromRegister: boolean; upload: { kind: string } | null }): HeadcountSource {
+  if (followsRegister(h)) return "upload"
   if (h.uploadId != null) return "chart"
   return "manual"
 }
