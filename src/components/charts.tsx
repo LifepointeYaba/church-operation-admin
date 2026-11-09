@@ -138,7 +138,7 @@ export function CohortChart({ rows }: { rows: CohortRow[] }) {
     <div className="space-y-3">
       <Segmented label="View" value={table ? "table" : "chart"} onChange={(v) => setTable(v === "table")} options={[["chart", "Chart"], ["table", "Table"]]} />
       {table ? (
-        <div className="max-h-80 overflow-auto rounded-md border">
+        <div className="max-h-80 overflow-auto rounded-xl border bg-card">
           <Table>
             <TableHeader className="sticky top-0 bg-background"><TableRow><TableHead>First visit</TableHead><TableHead className="text-right">First timers</TableHead><TableHead className="text-right">Returned ≤8 wks</TableHead><TableHead className="text-right">Settled (4+)</TableHead></TableRow></TableHeader>
             <TableBody>

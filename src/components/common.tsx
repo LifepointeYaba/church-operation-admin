@@ -17,20 +17,20 @@ export function PageHeader({ title, description, actions }: { title: string; des
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  "First Timer": "bg-transparent text-ember-text ring-1 ring-primary",
-  "Second Timer": "bg-surface-sunken text-bark ring-1 ring-bark/40 dark:text-bark",
-  "Regular, not done membership class": "bg-warning-soft text-warning",
-  Member: "bg-primary-soft text-primary",
-  Worker: "bg-primary text-primary-foreground",
-  "Member from other expressions": "bg-surface-sunken text-foreground ring-1 ring-border",
-  "Not Active": "bg-surface-sunken text-muted-foreground",
+  Worker: "border-primary/35 bg-primary-soft text-ember-text",
+  Member: "border-bark/30 bg-bark/10 text-bark",
+  "First Timer": "border-warning/35 bg-warning-soft text-warning",
+  "Second Timer": "border-primary/50 bg-card text-ember-text",
+  "Regular, not done membership class": "border-warning/40 bg-card text-warning",
+  "Member from other expressions": "border-border-strong/40 bg-muted text-foreground",
+  "Not Active": "border-border bg-muted text-muted-foreground",
 }
 
 export const shortStatus = (s: string) => (s === "Regular, not done membership class" ? "Regular (no class)" : s === "Member from other expressions" ? "Other expression" : s)
 
 export function StatusBadge({ status }: { status: string }) {
   return (
-    <Badge variant="secondary" className={cn("border-0 font-medium whitespace-nowrap", STATUS_STYLE[status])} title={status}>
+    <Badge variant="secondary" className={cn("px-2 py-0 text-[11px] leading-5 font-semibold whitespace-nowrap", STATUS_STYLE[status])} title={status}>
       {shortStatus(status)}
     </Badge>
   )

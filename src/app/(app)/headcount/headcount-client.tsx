@@ -138,7 +138,7 @@ export function HeadcountUpload() {
           {preview.skippedBlocks.map((b) => (
             <Alert key={b.title}><TriangleAlert className="size-4" /><AlertDescription><b>Skipped “{b.title}”:</b> {b.reason}</AlertDescription></Alert>
           ))}
-          <div className="max-h-96 overflow-auto rounded-md border">
+          <div className="max-h-96 overflow-auto rounded-xl border bg-card">
             <Table>
               <TableHeader className="sticky top-0 bg-background">
                 <TableRow>

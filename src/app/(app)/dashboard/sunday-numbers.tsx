@@ -40,45 +40,45 @@ export function SundayNumbers({ month, columns, selected, source, prevHref, next
       </div>
         }
         table={
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full border-collapse text-sm tabular-nums">
           <thead>
-            <tr className="border-b bg-muted/50">
-              <th scope="col" className="sticky left-0 z-10 bg-muted px-3 py-2 text-left font-medium">
+            <tr className="border-b bg-muted">
+              <th scope="col" className="sticky left-0 z-10 bg-muted px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">
                 <span className="sr-only">Measure</span>
               </th>
               {columns.map((c) => (
-                <th key={c.date} scope="col" className={cn("px-3 py-2 text-right font-medium whitespace-nowrap", c.date === selected && "bg-primary/10 text-foreground")}>
+                <th key={c.date} scope="col" className={cn("px-4 py-2.5 text-right text-xs font-semibold whitespace-nowrap text-muted-foreground", c.date === selected && "bg-primary-soft text-primary")}>
                   <Link href={hrefFor(c.date)} scroll={false} className="hover:underline">{formatDate(c.date)}</Link>
                 </th>
               ))}
-              <th scope="col" className="border-l px-3 py-2 text-right font-medium whitespace-nowrap">Average</th>
+              <th scope="col" className="border-l px-4 py-2.5 text-right text-xs font-semibold whitespace-nowrap text-muted-foreground">Average</th>
             </tr>
           </thead>
           <tbody>
             {BREAKDOWN_ROWS.map((r) => (
-              <tr key={r.key} className={cn("border-b last:border-0", r.strong && "bg-muted/30")}>
-                <th scope="row" className={cn("sticky left-0 z-10 bg-card px-3 py-1.5 text-left whitespace-nowrap", r.strong ? "font-semibold" : "font-medium")}>{r.label}</th>
+              <tr key={r.key} className={cn("border-b transition-colors last:border-0 hover:bg-muted/40", r.strong && "bg-muted/30")}>
+                <th scope="row" className={cn("sticky left-0 z-10 bg-card px-4 py-2 text-left whitespace-nowrap", r.strong ? "font-semibold" : "font-medium")}>{r.label}</th>
                 {columns.map((c) => {
                   const v = c.values?.[r.key]
                   return (
-                    <td key={c.date} className={cn("px-3 py-1.5 text-right", r.strong && "font-semibold", c.date === selected && "bg-primary/10")}>
+                    <td key={c.date} className={cn("px-4 py-2 text-right", r.strong && "font-semibold", c.date === selected && "bg-primary-soft/50")}>
                       {v ?? <span className="text-muted-foreground">—</span>}
                     </td>
                   )
                 })}
-                <td className={cn("border-l px-3 py-1.5 text-right", r.strong && "font-semibold")}>
+                <td className={cn("border-l px-4 py-2 text-right", r.strong && "font-semibold")}>
                   {avg(columns.map((c) => c.values?.[r.key])) ?? <span className="text-muted-foreground">—</span>}
                 </td>
               </tr>
             ))}
             {source === "headcount" && (
               <tr className="border-t text-muted-foreground">
-                <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-1.5 text-left font-normal whitespace-nowrap">Marked present in register</th>
+                <th scope="row" className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left font-normal whitespace-nowrap">Marked present in register</th>
                 {columns.map((c) => (
-                  <td key={c.date} className={cn("px-3 py-1.5 text-right", c.date === selected && "bg-primary/10")}>{c.present ?? "—"}</td>
+                  <td key={c.date} className={cn("px-4 py-2.5 text-right", c.date === selected && "bg-primary-soft/50")}>{c.present ?? "—"}</td>
                 ))}
-                <td className="border-l px-3 py-1.5 text-right">{avg(columns.map((c) => c.present)) ?? "—"}</td>
+                <td className="border-l px-4 py-2.5 text-right">{avg(columns.map((c) => c.present)) ?? "—"}</td>
               </tr>
             )}
           </tbody>
