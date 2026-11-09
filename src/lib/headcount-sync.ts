@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client"
+import type { Prisma, PrismaClient } from "@prisma/client"
 import { registerBreakdownNow, type Breakdown } from "./metrics/breakdown"
 import { computeTotal } from "./import/headcount"
 import { isoDate } from "./dates"
@@ -29,13 +29,13 @@ export async function syncHeadcountsFromRegister(db: PrismaClient, dates: string
   const res: HeadcountSyncResult = { created: [], refreshed: [], kept: [] }
   const sorted = [...new Set(dates)].sort()
   if (!sorted.length) return res
-  const register = await registerBreakdownNow(sorted[0], sorted.at(-1)!, {})
+  const register = await registerBreakdownNow(sorted[0], sorted.at(-1)!, {}, db)
   for (const date of sorted) {
     const numbers = register[date]
     if (!numbers) continue
     const service = await db.service.findUnique({
       where: { date: new Date(`${date}T00:00:00.000Z`) },
-      select: { id: true, headcounts: { where: { isCurrent: true }, include: { upload: { select: { kind: true } } } } },
+      select: { id: true, headcounts: { where: { isCurrent: true }, select: { fromRegister: true, upload: { select: { kind: true } } } } },
     })
     if (!service) continue
     const values = pick(numbers)
@@ -60,10 +60,11 @@ export async function syncHeadcountsFromRegister(db: PrismaClient, dates: string
  * so every Sunday from `dateIso` that the person attended is updated.
  * - No headcount yet → create one from the register (children 0).
  * - Headcount that follows the register → set the register numbers, keep children.
+ * Run it inside a transaction so attendance and headcount are saved together or not at all.
  * - Headcount entered by hand or from the Chart sheet → add/remove this person in the right
  *   group (worker/member/first/second timer, male/female) and in the total.
  */
-export async function syncHeadcountsForMark(db: PrismaClient, memberId: number, dateIso: string, change: () => Promise<void>) {
+export async function syncHeadcountsForMark(db: Prisma.TransactionClient, memberId: number, dateIso: string, change: () => Promise<void>) {
   const from = new Date(`${dateIso}T00:00:00.000Z`)
   const later = await db.attendance.findMany({
     where: { memberId, service: { date: { gt: from } } },
@@ -71,13 +72,13 @@ export async function syncHeadcountsForMark(db: PrismaClient, memberId: number, 
   })
   const dates = [...new Set([dateIso, ...later.map((a) => isoDate(a.service.date))])].sort()
   const last = dates.at(-1)!
-  const before = await registerBreakdownNow(dateIso, last, {})
+  const before = await registerBreakdownNow(dateIso, last, {}, db)
   await change()
-  const after = await registerBreakdownNow(dateIso, last, {})
+  const after = await registerBreakdownNow(dateIso, last, {}, db)
 
   const services = await db.service.findMany({
     where: { date: { in: dates.map((d) => new Date(`${d}T00:00:00.000Z`)) } },
-    select: { id: true, date: true, recordTaken: true, headcounts: { where: { isCurrent: true }, include: { upload: { select: { kind: true } } } } },
+    select: { id: true, date: true, recordTaken: true, headcounts: { where: { isCurrent: true }, select: { id: true, fromRegister: true, workers: true, members: true, firstTimers: true, secondTimers: true, total: true, male: true, female: true, upload: { select: { kind: true } } } } },
   })
   for (const svc of services) {
     const date = isoDate(svc.date)

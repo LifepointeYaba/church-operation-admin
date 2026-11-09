@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client"
 import { unstable_cache } from "next/cache"
 import { prisma } from "../db"
 import { isoDate } from "../dates"
@@ -24,10 +25,10 @@ export const BREAKDOWN_ROWS: { key: keyof Breakdown; label: string; strong?: boo
  * The same breakdown worked out from the attendance register, so it can be filtered by team and gender.
  * Workers = status Worker (always); first/second timers = anyone else on their first/second recorded visit; members = everyone else present.
  */
-async function _registerBreakdown(fromIso: string, toIso: string, f: Filters): Promise<Record<string, Breakdown>> {
+async function _registerBreakdown(fromIso: string, toIso: string, f: Filters, db: Prisma.TransactionClient = prisma): Promise<Record<string, Breakdown>> {
   const from = new Date(`${fromIso}T00:00:00Z`)
   const to = new Date(`${toIso}T00:00:00Z`)
-  const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
+  const rows = await db.$queryRaw<Record<string, unknown>[]>`
     WITH visits AS (
       SELECT a.member_id, s.date,
         (ROW_NUMBER() OVER (PARTITION BY a.member_id ORDER BY s.date))::int AS ord
@@ -59,10 +60,10 @@ async function _registerBreakdown(fromIso: string, toIso: string, f: Filters): P
   )
 }
 
-/** Uncached version, for writes that need numbers straight after an import. */
+/** Uncached version, for writes that need numbers straight after a change (pass `db` to read inside a transaction). */
 export const registerBreakdownNow = _registerBreakdown
 
-export const registerBreakdown = unstable_cache(_registerBreakdown, ["register-breakdown"], { tags: [METRICS_TAG], revalidate: 3600 })
+export const registerBreakdown = unstable_cache((fromIso: string, toIso: string, f: Filters) => _registerBreakdown(fromIso, toIso, f), ["register-breakdown"], { tags: [METRICS_TAG], revalidate: 3600 })
 
 export async function notesBetween(fromIso: string, toIso: string) {
   const notes = await prisma.serviceNote.findMany({
