@@ -8,7 +8,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+        <h2 className="text-[28px] leading-[34px] font-bold">{title}</h2>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -17,13 +17,13 @@ export function PageHeader({ title, description, actions }: { title: string; des
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  "First Timer": "bg-sky-100 text-sky-900 dark:bg-sky-500/15 dark:text-sky-200",
-  "Second Timer": "bg-indigo-100 text-indigo-900 dark:bg-indigo-500/15 dark:text-indigo-200",
-  "Regular, not done membership class": "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200",
-  Member: "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-200",
-  Worker: "bg-violet-100 text-violet-900 dark:bg-violet-500/15 dark:text-violet-200",
-  "Member from other expressions": "bg-teal-100 text-teal-900 dark:bg-teal-500/15 dark:text-teal-200",
-  "Not Active": "bg-zinc-200 text-zinc-800 dark:bg-zinc-500/20 dark:text-zinc-200",
+  "First Timer": "bg-ember-soft text-ember-text",
+  "Second Timer": "bg-ember-soft text-bark dark:text-bark",
+  "Regular, not done membership class": "bg-warning-soft text-warning",
+  Member: "bg-primary-soft text-primary",
+  Worker: "bg-primary text-primary-foreground",
+  "Member from other expressions": "bg-surface-sunken text-foreground ring-1 ring-border",
+  "Not Active": "bg-surface-sunken text-muted-foreground",
 }
 
 export const shortStatus = (s: string) => (s === "Regular, not done membership class" ? "Regular (no class)" : s === "Member from other expressions" ? "Other expression" : s)
@@ -55,10 +55,10 @@ export function ActivityLabel({ activity }: { activity: string }) {
 }
 
 const TONES = {
-  blue: "bg-chart-1/12 text-chart-1",
-  green: "bg-chart-3/12 text-chart-3",
-  amber: "bg-chart-4/15 text-chart-4",
-  violet: "bg-chart-7/12 text-chart-7",
+  blue: "bg-primary-soft text-primary",
+  green: "bg-primary-soft text-primary",
+  amber: "bg-warning-soft text-warning",
+  violet: "bg-ember-soft text-ember-text",
 } as const
 
 export function StatCard({ label, value, delta, icon: Icon, hint, tone = "blue" }: {
@@ -75,7 +75,7 @@ export function StatCard({ label, value, delta, icon: Icon, hint, tone = "blue" 
             </span>
           )}
         </div>
-        <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums"><CountUp value={value} /></div>
+        <div className="mt-1 font-display text-3xl font-bold tabular-nums"><CountUp value={value} /></div>
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           {delta != null && (
             <span className={cn(

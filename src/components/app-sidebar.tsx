@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BarChart3, CalendarCheck, Church, ClipboardList, FileClock, LayoutDashboard, PhoneCall, Settings, Upload, Users,
+  BarChart3, CalendarCheck, ClipboardList, FileClock, LayoutDashboard, PhoneCall, Settings, Upload, Users,
 } from "lucide-react"
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu,
@@ -42,12 +42,11 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="hero-gradient flex aspect-square size-8 items-center justify-center rounded-lg text-white shadow-md ring-1 ring-white/15">
-                  <Church className="size-4" />
-                </div>
-                <div className="grid text-left text-sm leading-tight">
-                  <span className="font-semibold">LifePointe</span>
-                  <span className="text-xs text-sidebar-foreground/60">Church admin</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/lifepointe-mark.png" alt="" className="size-8 shrink-0" />
+                <div className="grid text-left leading-tight">
+                  <span className="font-display text-base font-bold">LifePointe</span>
+                  <span className="text-xs text-muted-foreground">Church admin</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -57,7 +56,7 @@ export function AppSidebar() {
       <SidebarContent>
         {NAV.map((g) => (
           <SidebarGroup key={g.group}>
-            <SidebarGroupLabel className="text-[11px] font-semibold tracking-wider text-sidebar-foreground/45 uppercase">{g.group}</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">{g.group}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {g.items.map((item) => (
@@ -66,7 +65,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive(item.href)}
                       tooltip={item.label}
-                      className="relative text-sidebar-foreground/80 transition-colors duration-200 hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:shadow-sm before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-[3px] before:origin-center before:scale-y-0 before:rounded-full before:bg-sidebar-primary before:transition-transform before:duration-300 data-[active=true]:before:scale-y-100 [&>svg]:transition-transform [&>svg]:duration-200 hover:[&>svg]:scale-110"
+                      className="relative font-semibold text-sidebar-foreground/85 transition-colors duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-bold data-[active=true]:text-sidebar-accent-foreground before:absolute before:top-1.5 before:bottom-1.5 before:left-0 before:w-[3px] before:origin-center before:scale-y-0 before:rounded-full before:bg-sidebar-primary before:transition-transform before:duration-300 data-[active=true]:before:scale-y-100 [&>svg]:transition-transform [&>svg]:duration-200 hover:[&>svg]:scale-110"
                     >
                       <Link href={item.href} onClick={() => setOpenMobile(false)}>
                         <item.icon />
