@@ -112,7 +112,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               {s.streak3 > 0 && <span className="rounded-full bg-white/55 px-3 py-1 font-semibold dark:bg-black/15">{s.streak3} on a 3+ week streak</span>}
             </div>
           </div>
-          <Button asChild size="lg" className="h-11 rounded-xl px-6 text-base dark:bg-on-leaf dark:text-leaf dark:hover:bg-on-leaf/85">
+          <Button asChild size="lg" className="h-11 rounded-xl px-6 text-base">
             <Link href="/attendance"><CalendarCheck className="size-4" /> Mark attendance</Link>
           </Button>
         </div>

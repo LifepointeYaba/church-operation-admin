@@ -19,6 +19,8 @@
   --color-bark: var(--lp-bark);
   --color-ring-green: var(--lp-ring);
   --color-primary-soft: var(--lp-primary-soft);
+  --color-green: var(--lp-green);
+  --color-green-soft: var(--lp-green-soft);
   --color-primary-hover: var(--lp-primary-hover);
   --color-warning: var(--lp-warning);
   --color-warning-soft: var(--lp-warning-soft);
@@ -86,11 +88,16 @@
   --lp-ember-text: #c2410c;
   --lp-ember-soft: #fde5d9;
   --lp-bark: #7e3806;
-  --lp-primary: #4a6b12;
-  --lp-primary-hover: #3b560d;
+  /* Primary is LifePointe orange. The brand orange #e85228 only reaches 3.6:1 with white text,
+     so filled controls use the deeper ember-text shade (5.2:1). */
+  --lp-primary: #c2410c;
+  --lp-primary-hover: #9a3412;
   --lp-on-primary: #ffffff;
-  --lp-primary-soft: #e9f0d6;
-  --lp-focus: #c2410c;
+  --lp-primary-soft: #fde5d9;
+  --lp-green: #4a6b12;
+  --lp-green-soft: #e9f0d6;
+  /* Focus is green so it stands apart from orange controls. */
+  --lp-focus: #4a6b12;
   --lp-danger: #b4233a;
   --lp-warning: #8a5a00;
   --lp-warning-soft: #f7ecd2;
@@ -115,9 +122,9 @@
   --border: var(--lp-border);
   --input: var(--lp-border-strong);
   --ring: var(--lp-focus);
-  /* Chart series: deep green, ember, bark, ring green (lime is too light for lines on white). */
-  --chart-1: var(--lp-primary);
-  --chart-2: var(--lp-ember);
+  /* Chart series: orange, deep green, bark, ring green (lime is too light for lines on white). */
+  --chart-1: var(--lp-ember);
+  --chart-2: var(--lp-green);
   --chart-3: var(--lp-bark);
   --chart-4: var(--lp-ring);
   --chart-5: #8a5a00;
@@ -137,7 +144,7 @@
   --shadow-card-hover: 0 1px 2px rgba(22, 22, 22, 0.06), 0 2px 8px rgba(22, 22, 22, 0.05);
   --shadow-dialog: 0 8px 24px rgba(22, 22, 22, 0.1);
 
-  --status-good: var(--lp-primary);
+  --status-good: var(--lp-green);
   --status-warn: var(--lp-warning);
   --status-bad: var(--lp-danger);
 }
@@ -157,11 +164,13 @@
   --lp-ember-text: #ff7a45;
   --lp-ember-soft: #3a1f14;
   --lp-bark: #c27a45;
-  --lp-primary: #a9c94a;
-  --lp-primary-hover: #bcd862;
+  --lp-primary: #ff7a45;
+  --lp-primary-hover: #ff9466;
   --lp-on-primary: #12150f;
-  --lp-primary-soft: #26301a;
-  --lp-focus: #ff7a45;
+  --lp-primary-soft: #3a1f14;
+  --lp-green: #a9c94a;
+  --lp-green-soft: #26301a;
+  --lp-focus: #a9c94a;
   --lp-danger: #f97066;
   --lp-warning: #f5b83d;
   --lp-warning-soft: #33280f;

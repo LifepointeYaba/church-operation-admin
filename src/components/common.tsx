@@ -17,8 +17,8 @@ export function PageHeader({ title, description, actions }: { title: string; des
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  "First Timer": "bg-ember-soft text-ember-text",
-  "Second Timer": "bg-ember-soft text-bark dark:text-bark",
+  "First Timer": "bg-green-soft text-green",
+  "Second Timer": "bg-green-soft text-bark dark:text-bark",
   "Regular, not done membership class": "bg-warning-soft text-warning",
   Member: "bg-primary-soft text-primary",
   Worker: "bg-primary text-primary-foreground",
@@ -56,9 +56,9 @@ export function ActivityLabel({ activity }: { activity: string }) {
 
 const TONES = {
   blue: "bg-primary-soft text-primary",
-  green: "bg-primary-soft text-primary",
+  green: "bg-green-soft text-green",
   amber: "bg-warning-soft text-warning",
-  violet: "bg-ember-soft text-ember-text",
+  violet: "bg-green-soft text-green",
 } as const
 
 export function StatCard({ label, value, delta, icon: Icon, hint, tone = "blue" }: {
