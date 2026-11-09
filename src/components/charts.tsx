@@ -15,9 +15,9 @@ const monthLabel = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateStri
 
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex rounded-md border p-0.5">
+    <div role="group" aria-label={label} className="inline-flex rounded-full border bg-card p-0.5">
       {options.map(([v, l]) => (
-        <Button key={v} size="sm" variant={value === v ? "secondary" : "ghost"} className="h-7" aria-pressed={value === v} onClick={() => onChange(v)}>{l}</Button>
+        <Button key={v} size="sm" variant={value === v ? "secondary" : "ghost"} className="h-7 rounded-full px-3" aria-pressed={value === v} onClick={() => onChange(v)}>{l}</Button>
       ))}
     </div>
   )

@@ -55,39 +55,37 @@ export function ActivityLabel({ activity }: { activity: string }) {
 }
 
 const TONES = {
-  blue: "bg-primary-soft text-primary",
-  green: "bg-primary-soft text-primary",
+  blue: "bg-muted text-foreground",
+  green: "bg-muted text-foreground",
   amber: "bg-warning-soft text-warning",
   violet: "bg-primary-soft text-primary",
 } as const
 
-export function StatCard({ label, value, delta, icon: Icon, hint, tone = "blue" }: {
-  label: string; value: number; delta?: number | null; icon?: LucideIcon; hint?: string; tone?: keyof typeof TONES
+export function StatCard({ label, value, delta, icon: Icon, hint, tone = "blue", lowerIsBetter }: {
+  label: string; value: number; delta?: number | null; icon?: LucideIcon; hint?: string; tone?: keyof typeof TONES; lowerIsBetter?: boolean
 }) {
+  const good = delta != null && delta !== 0 && (delta > 0) !== !!lowerIsBetter
   return (
-    <Card className="hover-lift gap-0 py-4">
-      <CardContent className="px-4">
-        <div className="flex items-start justify-between gap-2">
-          <span className="text-sm font-medium text-muted-foreground">{label}</span>
-          {Icon && (
-            <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", TONES[tone])}>
-              <Icon className="size-[18px]" aria-hidden />
-            </span>
-          )}
+    <Card className="gap-0 py-4">
+      <CardContent className="flex items-center gap-3 px-4">
+        {Icon && (
+          <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-full", TONES[tone])}>
+            <Icon className="size-5" aria-hidden />
+          </span>
+        )}
+        <div className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-muted-foreground">{label}</span>
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-display text-2xl font-bold tabular-nums"><CountUp value={value} /></span>
+            {delta != null && (
+              <span className={cn("text-xs font-bold whitespace-nowrap tabular-nums", delta === 0 ? "text-muted-foreground" : good ? "text-primary" : "text-destructive")}>
+                {delta > 0 ? "▲" : delta < 0 ? "▼" : "•"} {delta > 0 ? "+" : ""}{delta}
+                <span className="font-semibold text-muted-foreground"> vs last Sunday</span>
+              </span>
+            )}
+          </div>
+          {hint && <div className="truncate text-xs text-muted-foreground">{hint}</div>}
         </div>
-        <div className="mt-1 font-display text-3xl font-bold tabular-nums"><CountUp value={value} /></div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          {delta != null && (
-            <span className={cn(
-              "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium tabular-nums",
-              delta > 0 ? "bg-status-good/12 text-status-good" : delta < 0 ? "bg-status-bad/12 text-status-bad" : "bg-muted",
-            )}>
-              {delta > 0 ? "▲" : delta < 0 ? "▼" : "•"} {Math.abs(delta)}
-            </span>
-          )}
-          {delta != null && <span>vs last Sunday</span>}
-        </div>
-        {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
       </CardContent>
     </Card>
   )
