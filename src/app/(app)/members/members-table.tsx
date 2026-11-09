@@ -6,7 +6,7 @@ import {
   type ColumnDef, type SortingState, type VisibilityState, flexRender, getCoreRowModel, getFilteredRowModel,
   getPaginationRowModel, getSortedRowModel, useReactTable,
 } from "@tanstack/react-table"
-import { ArrowUpDown, Columns3, Download, RotateCcw } from "lucide-react"
+import { ArrowUpDown, ChevronLeft, ChevronRight, Columns3, Download, RotateCcw } from "lucide-react"
 import { useActionMutation } from "@/hooks/use-action-mutation"
 import { useConfirm } from "@/components/confirm-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -163,7 +163,7 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
         {deleted.length === 0 ? (
           <EmptyState title="Nothing deleted">Deleted records stay here for 30 days and can be restored.</EmptyState>
         ) : (
-          <div className="rounded-lg border">
+          <div className="rounded-xl border bg-card">
             <Table>
               <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Deleted</TableHead><TableHead>Erased on</TableHead><TableHead /></TableRow></TableHeader>
               <TableBody>
@@ -249,9 +249,9 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
         </div>
       )}
 
-      <div className="max-h-[70vh] overflow-auto rounded-lg border">
+      <div className="max-h-[70vh] overflow-auto rounded-xl border bg-card">
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-background">
+          <TableHeader className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id}>
                 {hg.headers.map((h) => <TableHead key={h.id}>{h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}</TableHead>)}
@@ -269,12 +269,18 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{data.length.toLocaleString()} people</span>
-        <div className="flex items-center gap-2">
-          <span>Page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}</span>
-          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
-          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        {(() => {
+          const { pageIndex, pageSize } = table.getState().pagination
+          const total = table.getFilteredRowModel().rows.length
+          return <span>Results: {total ? pageIndex * pageSize + 1 : 0}–{Math.min(total, (pageIndex + 1) * pageSize)} of {total.toLocaleString()}</span>
+        })()}
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} aria-label="Previous page"><ChevronLeft className="size-4" /></Button>
+          <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-muted px-3 font-semibold text-foreground tabular-nums">
+            {table.getState().pagination.pageIndex + 1}<span className="font-normal text-muted-foreground">&nbsp;/ {Math.max(1, table.getPageCount())}</span>
+          </span>
+          <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} aria-label="Next page"><ChevronRight className="size-4" /></Button>
         </div>
       </div>
     </div>

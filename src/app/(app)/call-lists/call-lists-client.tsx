@@ -33,7 +33,7 @@ export function CallListTabs({ date, lists }: { date: string; lists: { key: stri
             <Button variant="outline" size="sm" asChild><a href={`/api/export/call-list?list=${l.key}&date=${date}&format=pdf`}><FileText className="size-4" /> PDF</a></Button>
           </div>
           {l.people.length === 0 ? <EmptyState title="No one on this list" /> : (
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-xl border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Status</TableHead><TableHead>Team</TableHead><TableHead>Responsible</TableHead><TableHead>Last attended</TableHead><TableHead /></TableRow>
@@ -78,7 +78,7 @@ export function SuggestionReview({ items, statuses }: { items: Suggestion[]; sta
   const busy = (s: Suggestion, approve: boolean) => m.isPending && m.variables?.s.id === s.id && m.variables.approve === approve
   const decide = (s: Suggestion, approve: boolean) => m.mutate({ s, approve })
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="overflow-x-auto rounded-xl border bg-card">
       <Table>
         <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Current</TableHead><TableHead>Suggested</TableHead><TableHead>Why</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>
