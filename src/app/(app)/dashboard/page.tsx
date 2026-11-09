@@ -99,20 +99,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="stagger space-y-5">
-      <section className="leaf-corner relative overflow-hidden bg-leaf p-5 text-on-leaf md:p-7">
+      <section className="leaf-corner relative overflow-hidden bg-[#c2410c] p-5 text-white md:p-7">
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[13px] font-bold tracking-[0.06em] uppercase">{greeting()}</p>
             <h2 className="mt-1 text-[28px] leading-[34px] font-bold md:text-[40px] md:leading-[46px] md:tracking-[-0.015em]">Sunday {formatDate(refIso, "long")}</h2>
             <div className="mt-3 flex flex-wrap gap-2 text-sm">
-              <span className="rounded-full bg-white/55 px-3 py-1 font-semibold dark:bg-black/15">{point.present} marked present</span>
+              <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{point.present} marked present</span>
               {point.headcount
-                ? <span className="rounded-full bg-white/55 px-3 py-1 font-semibold dark:bg-black/15">Headcount {point.headcount.total}</span>
-                : <span className="rounded-full bg-white/40 px-3 py-1 font-semibold dark:bg-black/10">No headcount yet</span>}
-              {s.streak3 > 0 && <span className="rounded-full bg-white/55 px-3 py-1 font-semibold dark:bg-black/15">{s.streak3} on a 3+ week streak</span>}
+                ? <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">Headcount {point.headcount.total}</span>
+                : <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">No headcount yet</span>}
+              {s.streak3 > 0 && <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{s.streak3} on a 3+ week streak</span>}
             </div>
           </div>
-          <Button asChild size="lg" className="h-11 rounded-xl px-6 text-base">
+          <Button asChild size="lg" className="h-11 rounded-xl bg-white px-6 text-base text-[#c2410c] hover:bg-white/90">
             <Link href="/attendance"><CalendarCheck className="size-4" /> Mark attendance</Link>
           </Button>
         </div>

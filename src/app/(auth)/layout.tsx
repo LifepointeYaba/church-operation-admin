@@ -1,7 +1,7 @@
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <main className="grid min-h-svh lg:grid-cols-[1.1fr_1fr]">
-      <section className="relative hidden overflow-hidden bg-leaf p-10 text-on-leaf lg:flex lg:flex-col lg:justify-between">
+      <section className="relative hidden overflow-hidden bg-[#c2410c] p-10 text-white lg:flex lg:flex-col lg:justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/lifepointe-horizontal-white.png" alt="LifePointe" className="relative w-48" />
         <div className="animate-fade-up relative max-w-md">

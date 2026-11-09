@@ -74,13 +74,13 @@
 
 :root {
   /* LifePointe design system tokens (light). Source: LifePointe design system, tokens.json. */
-  --lp-surface: #fafbf6;
+  --lp-surface: #fbf9f7;
   --lp-surface-raised: #ffffff;
-  --lp-surface-sunken: #f0f3e8;
+  --lp-surface-sunken: #f5efe9;
   --lp-ink: #2a2a2a;
-  --lp-ink-muted: #545a4b;
-  --lp-border: #dfe4d4;
-  --lp-border-strong: #7c8670;
+  --lp-ink-muted: #5c544d;
+  --lp-border: #ebe2d9;
+  --lp-border-strong: #877a6e;
   --lp-ring: #87b22e;
   --lp-leaf: #a2c93a;
   --lp-on-leaf: #2a2a2a;
@@ -94,10 +94,10 @@
   --lp-primary-hover: #9a3412;
   --lp-on-primary: #ffffff;
   --lp-primary-soft: #fde5d9;
-  --lp-green: #4a6b12;
-  --lp-green-soft: #e9f0d6;
-  /* Focus is green so it stands apart from orange controls. */
-  --lp-focus: #4a6b12;
+  --lp-green: #c2410c;
+  --lp-green-soft: #fde5d9;
+  /* Focus is charcoal (light-ink in dark) so it stands apart from orange controls. */
+  --lp-focus: #2a2a2a;
   --lp-danger: #b4233a;
   --lp-warning: #8a5a00;
   --lp-warning-soft: #f7ecd2;
@@ -122,13 +122,13 @@
   --border: var(--lp-border);
   --input: var(--lp-border-strong);
   --ring: var(--lp-focus);
-  /* Chart series: orange, deep green, bark, ring green (lime is too light for lines on white). */
+  /* Chart series: all warm, told apart by lightness: orange, bark brown, amber, deep orange. */
   --chart-1: var(--lp-ember);
-  --chart-2: var(--lp-green);
-  --chart-3: var(--lp-bark);
-  --chart-4: var(--lp-ring);
+  --chart-2: var(--lp-bark);
+  --chart-3: #d99a2b;
+  --chart-4: #9a3412;
   --chart-5: #8a5a00;
-  --chart-6: #54613f;
+  --chart-6: #877a6e;
   --chart-7: var(--lp-ember-text);
   --chart-8: var(--lp-danger);
   --radius: 0.75rem;
@@ -150,13 +150,13 @@
 }
 
 .dark {
-  --lp-surface: #12150f;
-  --lp-surface-raised: #1b1f17;
-  --lp-surface-sunken: #0d0f0a;
-  --lp-ink: #edf0e4;
-  --lp-ink-muted: #a6ad98;
-  --lp-border: #31362a;
-  --lp-border-strong: #6e7862;
+  --lp-surface: #15120f;
+  --lp-surface-raised: #1f1a16;
+  --lp-surface-sunken: #0f0d0b;
+  --lp-ink: #f3ede6;
+  --lp-ink-muted: #b3a89d;
+  --lp-border: #3a322b;
+  --lp-border-strong: #7d7064;
   --lp-ring: #9fbe5c;
   --lp-leaf: #b5d33a;
   --lp-on-leaf: #12150f;
@@ -168,15 +168,15 @@
   --lp-primary-hover: #ff9466;
   --lp-on-primary: #12150f;
   --lp-primary-soft: #3a1f14;
-  --lp-green: #a9c94a;
-  --lp-green-soft: #26301a;
-  --lp-focus: #a9c94a;
+  --lp-green: #ff7a45;
+  --lp-green-soft: #3a1f14;
+  --lp-focus: #f3ede6;
   --lp-danger: #f97066;
   --lp-warning: #f5b83d;
   --lp-warning-soft: #33280f;
 
   --chart-5: #f5b83d;
-  --chart-6: #a6ad98;
+  --chart-6: #b3a89d;
   --shadow-card: none;
   --shadow-card-hover: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-dialog: 0 8px 24px rgba(0, 0, 0, 0.6);
