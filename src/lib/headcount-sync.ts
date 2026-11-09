@@ -35,7 +35,7 @@ export async function syncHeadcountsFromRegister(db: PrismaClient, dates: string
     if (!numbers) continue
     const service = await db.service.findUnique({
       where: { date: new Date(`${date}T00:00:00.000Z`) },
-      select: { id: true, headcounts: { where: { isCurrent: true }, select: { fromRegister: true, upload: { select: { kind: true } } } } },
+      select: { id: true, headcounts: { where: { isCurrent: true }, select: { id: true, fromRegister: true, upload: { select: { kind: true } } } } },
     })
     if (!service) continue
     const values = pick(numbers)
