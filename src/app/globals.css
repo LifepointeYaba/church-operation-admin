@@ -39,6 +39,16 @@
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
   --color-status-good: var(--status-good);
+  --color-status-good-soft: var(--status-good-soft);
+  --color-status-bad-soft: var(--status-bad-soft);
+  --color-st-worker: var(--st-worker);
+  --color-st-worker-soft: var(--st-worker-soft);
+  --color-st-member: var(--st-member);
+  --color-st-member-soft: var(--st-member-soft);
+  --color-st-second: var(--st-second);
+  --color-st-second-soft: var(--st-second-soft);
+  --color-st-first: var(--st-first);
+  --color-st-first-soft: var(--st-first-soft);
   --color-status-warn: var(--status-warn);
   --color-status-bad: var(--status-bad);
   --shadow-card: var(--shadow-card);
@@ -144,9 +154,21 @@
   --shadow-card-hover: 0 1px 2px rgba(22, 22, 22, 0.06), 0 2px 8px rgba(22, 22, 22, 0.05);
   --shadow-dialog: 0 8px 24px rgba(22, 22, 22, 0.1);
 
-  --status-good: var(--lp-green);
+  /* Activity: green = active, red = at risk (the only place red is used for status). */
+  --status-good: #15803d;
+  --status-good-soft: #dcfce7;
   --status-warn: var(--lp-warning);
-  --status-bad: var(--lp-danger);
+  --status-bad: #b91c1c;
+  --status-bad-soft: #fee2e2;
+  /* Member status colour codes. Text colours pass 4.5:1 on their soft fills. */
+  --st-worker: #c2410c;
+  --st-worker-soft: #ffedd5;
+  --st-member: #1d4ed8;
+  --st-member-soft: #dbeafe;
+  --st-second: #7e22ce;
+  --st-second-soft: #f3e8ff;
+  --st-first: #a16207;
+  --st-first-soft: #fef9c3;
 }
 
 .dark {
@@ -174,6 +196,19 @@
   --lp-danger: #f97066;
   --lp-warning: #f5b83d;
   --lp-warning-soft: #33280f;
+
+  --status-good: #4ade80;
+  --status-good-soft: #14532d66;
+  --status-bad: #f87171;
+  --status-bad-soft: #7f1d1d66;
+  --st-worker: #fb923c;
+  --st-worker-soft: #7c2d1240;
+  --st-member: #60a5fa;
+  --st-member-soft: #1e3a8a55;
+  --st-second: #c084fc;
+  --st-second-soft: #581c8755;
+  --st-first: #facc15;
+  --st-first-soft: #713f1240;
 
   --chart-5: #f5b83d;
   --chart-6: #b3a89d;

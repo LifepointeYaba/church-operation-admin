@@ -76,9 +76,9 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
       <TrendFilters statuses={settings.statuses} teams={teams.map((t) => t.name)} range={range} from={from} to={to} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="Active now" value={counts.active} icon={Activity} tone="green" />
+        <StatCard label="Active now" value={counts.active} icon={Activity} tone="good" />
         <StatCard label="At risk" value={counts.at_risk} icon={TriangleAlert} tone="amber" />
-        <StatCard label="Inactive" value={counts.inactive} icon={UserMinus} tone="violet" />
+        <StatCard label="Inactive" value={counts.inactive} icon={UserMinus} tone="blue" />
         <StatCard label="Attended in range" value={inRange.attenders} icon={CalendarCheck} tone="blue" />
         <StatCard label="Regulars in range" value={inRange.regulars} icon={Repeat} tone="green" hint="Came to at least half the Sundays" />
       </div>

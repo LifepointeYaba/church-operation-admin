@@ -126,7 +126,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Present this Sunday" value={s.present} delta={d(s.present, p?.present)} icon={CalendarCheck} tone="blue" hint={point.headcount && !filtered ? `Headcount ${point.headcount.total}` : undefined} />
-        <StatCard label="Active" value={s.active} delta={d(s.active, p?.active)} icon={Activity} tone="green" hint={`Came to ≥1 of last ${settings.atRiskWeeks}`} />
+        <StatCard label="Active" value={s.active} delta={d(s.active, p?.active)} icon={Activity} tone="good" hint={`Came to ≥1 of last ${settings.atRiskWeeks}`} />
         <StatCard label="At risk" value={s.at_risk} delta={d(s.at_risk, p?.at_risk)} icon={TriangleAlert} tone="amber" lowerIsBetter hint={`Missed ${settings.atRiskWeeks}–${settings.inactiveWeeks - 1} in a row`} />
         <StatCard label="First timers" value={lists.firstTimers.length} delta={d(lists.firstTimers.length, prevLists?.firstTimers.length)} icon={UserPlus} tone="violet" hint={point.headcount && !filtered ? `Headcount: ${point.headcount.firstTimers}` : undefined} />
       </div>

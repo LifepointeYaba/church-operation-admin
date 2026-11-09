@@ -6,11 +6,10 @@ import { cn } from "@/lib/utils"
 import { shortStatus } from "./common"
 
 const DOT: Record<string, string> = {
-  Worker: "bg-primary",
-  Member: "bg-primary/60",
-  "First Timer": "bg-bark",
-  "Second Timer": "bg-bark/60",
-  "Regular, not done membership class": "bg-warning",
+  Worker: "bg-st-worker",
+  Member: "bg-st-member",
+  "Second Timer": "bg-st-second",
+  "First Timer": "bg-st-first",
 }
 
 /** Compact list of people for dashboard alerts and call lists: avatar, name, status dot, last seen. */

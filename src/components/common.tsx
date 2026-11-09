@@ -17,10 +17,10 @@ export function PageHeader({ title, description, actions }: { title: string; des
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  Worker: "border-primary/35 bg-primary-soft text-ember-text",
-  Member: "border-bark/30 bg-bark/10 text-bark",
-  "First Timer": "border-warning/35 bg-warning-soft text-warning",
-  "Second Timer": "border-primary/50 bg-card text-ember-text",
+  Worker: "border-st-worker/35 bg-st-worker-soft text-st-worker",
+  Member: "border-st-member/35 bg-st-member-soft text-st-member",
+  "Second Timer": "border-st-second/35 bg-st-second-soft text-st-second",
+  "First Timer": "border-st-first/40 bg-st-first-soft text-st-first",
   "Regular, not done membership class": "border-warning/40 bg-card text-warning",
   "Member from other expressions": "border-border-strong/40 bg-muted text-foreground",
   "Not Active": "border-border bg-muted text-muted-foreground",
@@ -38,8 +38,8 @@ export function StatusBadge({ status }: { status: string }) {
 
 const ACT: Record<string, { label: string; cls: string }> = {
   active: { label: "Active", cls: "text-status-good" },
-  at_risk: { label: "At risk", cls: "text-status-warn" },
-  inactive: { label: "Inactive", cls: "text-status-bad" },
+  at_risk: { label: "At risk", cls: "text-status-bad" },
+  inactive: { label: "Inactive", cls: "text-muted-foreground" },
   lapsed: { label: "Lapsed", cls: "text-muted-foreground" },
   never: { label: "Never present", cls: "text-muted-foreground" },
 }
@@ -57,7 +57,8 @@ export function ActivityLabel({ activity }: { activity: string }) {
 const TONES = {
   blue: "bg-muted text-foreground",
   green: "bg-muted text-foreground",
-  amber: "bg-warning-soft text-warning",
+  amber: "bg-status-bad-soft text-status-bad",
+  good: "bg-status-good-soft text-status-good",
   violet: "bg-primary-soft text-primary",
 } as const
 
@@ -78,7 +79,7 @@ export function StatCard({ label, value, delta, icon: Icon, hint, tone = "blue",
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="font-display text-2xl font-bold tabular-nums"><CountUp value={value} /></span>
             {delta != null && (
-              <span className={cn("text-xs font-bold whitespace-nowrap tabular-nums", delta === 0 ? "text-muted-foreground" : good ? "text-primary" : "text-destructive")}>
+              <span className={cn("text-xs font-bold whitespace-nowrap tabular-nums", delta === 0 ? "text-muted-foreground" : good ? "text-status-good" : "text-muted-foreground")}>
                 {delta > 0 ? "▲" : delta < 0 ? "▼" : "•"} {delta > 0 ? "+" : ""}{delta}
                 <span className="font-semibold text-muted-foreground"> vs last Sunday</span>
               </span>
