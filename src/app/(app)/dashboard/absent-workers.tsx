@@ -40,27 +40,27 @@ export function AbsentWorkers({ workers, missed }: { workers: MemberStat[]; miss
       table={workers.length === 0 ? (
         <p className="text-sm text-muted-foreground">No workers match.</p>
       ) : (
-        <div className="max-h-[420px] overflow-auto rounded-md border">
+        <div className="max-h-[420px] overflow-auto rounded-xl border bg-card">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-muted">
               <tr className="text-left">
-                <th scope="col" className="px-3 py-2 font-medium">Name</th>
-                <th scope="col" className="px-3 py-2 font-medium">Phone</th>
-                <th scope="col" className="hidden px-3 py-2 font-medium md:table-cell">Team</th>
-                <th scope="col" className="px-3 py-2 font-medium whitespace-nowrap">Last came</th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">Missed</th>
+                <th scope="col" className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Name</th>
+                <th scope="col" className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Phone</th>
+                <th scope="col" className="hidden px-4 py-2.5 text-xs font-semibold text-muted-foreground md:table-cell">Team</th>
+                <th scope="col" className="px-4 py-2.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">Last came</th>
+                <th scope="col" className="px-4 py-2.5 text-right text-xs font-semibold text-muted-foreground">Missed</th>
               </tr>
             </thead>
             <tbody>
               {workers.map((m) => (
-                <tr key={m.id} className="border-t">
-                  <td className="px-3 py-2"><Link href={`/members/${m.id}`} className="font-medium hover:underline">{m.firstName} {m.lastName}</Link></td>
-                  <td className="px-3 py-2 whitespace-nowrap">
+                <tr key={m.id} className="border-t transition-colors hover:bg-muted/40">
+                  <td className="px-4 py-2.5"><Link href={`/members/${m.id}`} className="font-semibold hover:underline">{m.firstName} {m.lastName}</Link></td>
+                  <td className="px-4 py-2.5 whitespace-nowrap">
                     {m.phone ? <a href={`tel:${m.phone}`} className="hover:underline">{displayPhone(m.phone)}</a> : <span className="text-muted-foreground">No phone</span>}
                   </td>
-                  <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">{m.teams.join(", ") || "—"}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{m.lastDate ? formatDate(m.lastDate) : "Never"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums">{m.lastRn == null ? "All" : m.lastRn - 1}</td>
+                  <td className="hidden px-4 py-2.5 text-muted-foreground md:table-cell">{m.teams.join(", ") || "—"}</td>
+                  <td className="px-4 py-2.5 whitespace-nowrap">{m.lastDate ? formatDate(m.lastDate) : "Never"}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{m.lastRn == null ? "All" : m.lastRn - 1}</td>
                 </tr>
               ))}
             </tbody>

@@ -120,37 +120,35 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="stagger space-y-5">
-      <section className="hero-gradient relative overflow-hidden rounded-2xl p-5 text-white shadow-card md:p-7">
-        <div aria-hidden className="animate-float pointer-events-none absolute -top-16 -right-10 size-64 rounded-full bg-white/10 blur-2xl" />
-        <div aria-hidden className="animate-float pointer-events-none absolute -bottom-24 left-1/3 size-72 rounded-full bg-fuchsia-300/15 blur-3xl [animation-delay:-6s]" />
+      <section className="leaf-corner relative overflow-hidden bg-[#c2410c] p-5 text-white md:p-7">
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm text-white/75">{greeting()}</p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">Sunday {formatDate(refIso, "long")}</h2>
+            <p className="text-[13px] font-bold tracking-[0.06em] uppercase">{greeting()}</p>
+            <h2 className="mt-1 text-[28px] leading-[34px] font-bold md:text-[40px] md:leading-[46px] md:tracking-[-0.015em]">Sunday {formatDate(refIso, "long")}</h2>
             <div className="mt-3 flex flex-wrap gap-2 text-sm">
-              <span className="rounded-full bg-white/15 px-3 py-1 backdrop-blur-sm">{point.present} marked present</span>
+              <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{point.present} marked present</span>
               {point.headcount
-                ? <span className="rounded-full bg-white/15 px-3 py-1 backdrop-blur-sm">Headcount {point.headcount.total}</span>
-                : <span className="rounded-full bg-white/10 px-3 py-1 text-white/80">No headcount yet</span>}
-              {s.streak3 > 0 && <span className="rounded-full bg-white/15 px-3 py-1 backdrop-blur-sm">{s.streak3} on a 3+ week streak</span>}
+                ? <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">Headcount {point.headcount.total}</span>
+                : <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">No headcount yet</span>}
+              {s.streak3 > 0 && <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{s.streak3} on a 3+ week streak</span>}
             </div>
           </div>
-          <Button asChild size="lg" className="bg-white text-[oklch(0.35_0.12_262)] shadow-lg transition-transform hover:scale-[1.03] hover:bg-white active:scale-100">
+          <Button asChild size="lg" className="h-11 rounded-full bg-white px-6 text-base text-[#c2410c] hover:bg-white/90">
             <Link href="/attendance"><CalendarCheck className="size-4" /> Mark attendance</Link>
           </Button>
         </div>
       </section>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card/70 p-2 shadow-card backdrop-blur" role="group" aria-label="Filters">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2" role="group" aria-label="Filters">
         <span className="hidden px-2 text-sm font-medium text-muted-foreground sm:inline">Filter</span>
-        <ParamSelect className="min-w-0 flex-1 sm:flex-none" name="date" label="Sunday" value={refIso} options={[...taken].reverse().map((t) => ({ value: t.date, label: formatDate(t.date, "long") }))} />
-        <ParamSelect className="min-w-0 flex-1 sm:flex-none" name="team" label="Team" value={sp.team ?? ""} options={[{ value: "", label: "All teams" }, ...teams.map((t) => ({ value: t.name, label: t.name }))]} />
-        <ParamSelect className="min-w-0 flex-1 sm:flex-none" name="gender" label="Gender" value={sp.gender ?? ""} options={[{ value: "", label: "Any gender" }, { value: "Female", label: "Female" }, { value: "Male", label: "Male" }]} />
+        <ParamSelect className="h-9 min-w-0 flex-1 rounded-full px-4 sm:flex-none" name="date" label="Sunday" value={refIso} options={[...taken].reverse().map((t) => ({ value: t.date, label: formatDate(t.date, "long") }))} />
+        <ParamSelect className="h-9 min-w-0 flex-1 rounded-full px-4 sm:flex-none" name="team" label="Team" value={sp.team ?? ""} options={[{ value: "", label: "All teams" }, ...teams.map((t) => ({ value: t.name, label: t.name }))]} />
+        <ParamSelect className="h-9 min-w-0 flex-1 rounded-full px-4 sm:flex-none" name="gender" label="Gender" value={sp.gender ?? ""} options={[{ value: "", label: "Any gender" }, { value: "Female", label: "Female" }, { value: "Male", label: "Male" }]} />
         {filtered && <Button variant="ghost" size="sm" asChild><NavLink href={hrefWith({ team: undefined, gender: undefined })}>Clear filters</NavLink></Button>}
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Present this Sunday" value={s.present} delta={d(s.present, p?.present)} icon={CalendarCheck} tone="blue" hint={point.headcount && !filtered ? `Headcount ${point.headcount.total}` : undefined} />
-        <StatCard label="Active" value={s.active} delta={d(s.active, p?.active)} icon={Activity} tone="green" hint={`Came to ≥1 of last ${settings.atRiskWeeks}`} />
-        <StatCard label="At risk" value={s.at_risk} delta={d(s.at_risk, p?.at_risk)} icon={TriangleAlert} tone="amber" hint={`Missed ${settings.atRiskWeeks}–${settings.inactiveWeeks - 1} in a row`} />
+        <StatCard label="Active" value={s.active} delta={d(s.active, p?.active)} icon={Activity} tone="good" hint={`Came to ≥1 of last ${settings.atRiskWeeks}`} />
+        <StatCard label="At risk" value={s.at_risk} delta={d(s.at_risk, p?.at_risk)} icon={TriangleAlert} tone="amber" lowerIsBetter hint={`Missed ${settings.atRiskWeeks}–${settings.inactiveWeeks - 1} in a row`} />
         <StatCard label="First timers" value={lists.firstTimers.length} delta={d(lists.firstTimers.length, prevLists?.firstTimers.length)} icon={UserPlus} tone="violet" hint={point.headcount && !filtered ? `Headcount: ${point.headcount.firstTimers}` : undefined} />
       </div>
 
@@ -166,11 +164,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </CardDescription>
           {!filtered && (
             <CardAction>
-              <div className="inline-flex rounded-md border p-0.5 text-sm" role="group" aria-label="Source">
+              <div className="inline-flex rounded-full border bg-card p-0.5 text-sm" role="group" aria-label="Source">
                 {(["headcount", "register"] as const).map((src) => (
                   <NavLink key={src} href={hrefWith({ source: src === "register" ? "register" : undefined })}
                     aria-current={source === src}
-                    className={cn("rounded px-2.5 py-1", source === src ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                    className={cn("rounded-full px-3 py-1 font-semibold", source === src ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
                     {src === "headcount" ? "Headcount" : "Register"}
                   </NavLink>
                 ))}
@@ -216,7 +214,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 lift-children">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Came last Sunday, not this one ({s.cameLastNotThis.length})</CardTitle>

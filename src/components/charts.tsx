@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, XAxis, YAxis } from "recharts"
+import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, XAxis, YAxis } from "recharts"
 import {
   ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig,
 } from "@/components/ui/chart"
@@ -15,13 +15,16 @@ const monthLabel = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateStri
 
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex rounded-md border p-0.5">
+    <div role="group" aria-label={label} className="inline-flex rounded-full border bg-card p-0.5">
       {options.map(([v, l]) => (
-        <Button key={v} size="sm" variant={value === v ? "secondary" : "ghost"} className="h-7" aria-pressed={value === v} onClick={() => onChange(v)}>{l}</Button>
+        <Button key={v} size="sm" variant={value === v ? "secondary" : "ghost"} className="h-7 rounded-full px-3" aria-pressed={value === v} onClick={() => onChange(v)}>{l}</Button>
       ))}
     </div>
   )
 }
+
+/** Dark tooltip used on line charts. */
+const DARK_TOOLTIP = "border-none bg-[#2a2a2a] text-white shadow-lg [&_.text-foreground]:text-white [&_.text-muted-foreground]:text-white/70"
 
 export type SundayPoint = { date: string; present: number; total: number | null }
 export type MonthPoint = { month: string; present: number | null; headcount: number | null; sundays: number }
@@ -55,15 +58,21 @@ export function AttendanceChart({ sundays, months, defaultFrom = "2025-01-01", a
         )}
       </div>
       <ChartContainer config={lineConfig} className="aspect-auto h-72 w-full">
-        <LineChart data={data} margin={{ left: 4, right: 12, top: 8 }} accessibilityLayer>
+        <ComposedChart data={data} margin={{ left: 4, right: 12, top: 8 }} accessibilityLayer>
+          <defs>
+            <linearGradient id="fill-present" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-present)" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="var(--color-present)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid vertical={false} strokeOpacity={0.5} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={24} tickMargin={8} />
           <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />
-          <ChartTooltip cursor={{ strokeDasharray: "3 3" }} content={<ChartTooltipContent indicator="line" />} />
+          <ChartTooltip cursor={{ strokeDasharray: "3 3" }} content={<ChartTooltipContent indicator="line" className={DARK_TOOLTIP} />} />
           <ChartLegend content={<ChartLegendContent />} />
-          <Line dataKey="present" type="monotone" stroke="var(--color-present)" strokeWidth={2} dot={view === "month" ? { r: 3 } : false} activeDot={{ r: 5 }} connectNulls />
-          <Line dataKey="headcount" type="monotone" stroke="var(--color-headcount)" strokeWidth={2} dot={view === "month" ? { r: 3 } : false} activeDot={{ r: 5 }} connectNulls />
-        </LineChart>
+          <Area dataKey="present" type="monotone" stroke="var(--color-present)" strokeWidth={2.5} fill="url(#fill-present)" dot={false} activeDot={{ r: 5 }} connectNulls />
+          <Line dataKey="headcount" type="monotone" stroke="var(--color-headcount)" strokeWidth={2.5} dot={false} activeDot={{ r: 5 }} connectNulls />
+        </ComposedChart>
       </ChartContainer>
       <p className="text-xs text-muted-foreground">The headcount adds children and unregistered visitors, so it runs a little above the registered count. Headcounts start Jan 2026.</p>
     </div>
@@ -129,7 +138,7 @@ export function CohortChart({ rows }: { rows: CohortRow[] }) {
     <div className="space-y-3">
       <Segmented label="View" value={table ? "table" : "chart"} onChange={(v) => setTable(v === "table")} options={[["chart", "Chart"], ["table", "Table"]]} />
       {table ? (
-        <div className="max-h-80 overflow-auto rounded-md border">
+        <div className="max-h-80 overflow-auto rounded-xl border bg-card">
           <Table>
             <TableHeader className="sticky top-0 bg-background"><TableRow><TableHead>First visit</TableHead><TableHead className="text-right">First timers</TableHead><TableHead className="text-right">Returned ≤8 wks</TableHead><TableHead className="text-right">Settled (4+)</TableHead></TableRow></TableHeader>
             <TableBody>
