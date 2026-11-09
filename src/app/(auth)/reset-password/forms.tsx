@@ -40,7 +40,7 @@ export function RequestResetForm() {
             <Input id="email" name="email" type="email" required />
           </div>
           <Feedback state={state} />
-          <Button className="h-10 w-full" disabled={pending}>Send reset link</Button>
+          <Button className="h-10 w-full" loading={pending}>Send reset link</Button>
           <Link href="/login" className="block text-center text-sm text-primary hover:underline">Back to sign in</Link>
         </form>
       </CardContent>
@@ -74,7 +74,7 @@ export function NewPasswordForm({ token }: { token: string }) {
               <Input id="confirm" name="confirm" type="password" minLength={10} autoComplete="new-password" required />
             </div>
             <Feedback state={state} />
-            <Button className="h-10 w-full" disabled={pending}>Update password</Button>
+            <Button className="h-10 w-full" loading={pending}>Update password</Button>
           </form>
         )}
       </CardContent>

@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { NavLink } from "@/components/navigation"
 import { Activity, CalendarCheck, TriangleAlert, UserPlus } from "lucide-react"
 import { requireAdmin } from "@/lib/auth"
 import { prisma } from "@/lib/db"
@@ -15,7 +16,8 @@ import { PersonList } from "@/components/person-list"
 import { ParamSelect } from "@/components/param-select"
 import { AttendanceChart } from "@/components/charts"
 import { SundayNumbers } from "./sunday-numbers"
-import { AbsentWorkers, MISSED_OPTIONS } from "./absent-workers"
+import { MISSED_OPTIONS } from "./absent-workers"
+import { ALL_STATUSES, AbsentMembers, absentOn, lastUploadedSunday } from "./absent-members"
 
 export const metadata = { title: "Dashboard" }
 
@@ -24,7 +26,10 @@ function greeting() {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"
 }
 
-type SP = { date?: string; team?: string; gender?: string; source?: string; missed?: string }
+type SP = {
+  date?: string; team?: string; gender?: string; source?: string; missed?: string
+  abs_date?: string; abs_team?: string; abs_status?: string; abs_gender?: string
+}
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireAdmin()
@@ -90,6 +95,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .filter((m) => m.status === "Worker" && (m.lastRn == null || m.lastRn > missed))
     .sort((a, b) => (a.lastDate ?? "").localeCompare(b.lastDate ?? ""))
 
+  // "Who didn't come" card: its own filters, defaulting to the latest Sunday in the last upload.
+  const takenDates = taken.map((t) => t.date)
+  const lastUploaded = await lastUploadedSunday()
+  const absDate = [sp.abs_date, lastUploaded].find((d) => d && takenDates.includes(d)) ?? takenDates.at(-1)!
+  const absStatus = sp.abs_status === ALL_STATUSES || settings.statuses.includes(sp.abs_status ?? "") ? sp.abs_status! : ""
+  const absGender = sp.abs_gender === "Female" || sp.abs_gender === "Male" ? sp.abs_gender : ""
+  const absTeam = teams.some((t) => t.name === sp.abs_team) ? sp.abs_team! : ""
+  const absentMembers = absentOn(
+    await memberStats(absDate, {
+      team: absTeam || undefined,
+      gender: absGender || undefined,
+      status: absStatus && absStatus !== ALL_STATUSES ? absStatus : undefined,
+    }),
+    absStatus,
+  )
+
   const chartSundays = (filteredPresent ?? taken)
     .filter((t) => t.date <= refIso)
     .map((t) => ({ date: t.date, present: t.present, total: filtered ? null : taken.find((x) => x.date === t.date)?.headcount?.total ?? null }))
@@ -122,7 +143,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <ParamSelect className="h-9 min-w-0 flex-1 rounded-full px-4 sm:flex-none" name="date" label="Sunday" value={refIso} options={[...taken].reverse().map((t) => ({ value: t.date, label: formatDate(t.date, "long") }))} />
         <ParamSelect className="h-9 min-w-0 flex-1 rounded-full px-4 sm:flex-none" name="team" label="Team" value={sp.team ?? ""} options={[{ value: "", label: "All teams" }, ...teams.map((t) => ({ value: t.name, label: t.name }))]} />
         <ParamSelect className="h-9 min-w-0 flex-1 rounded-full px-4 sm:flex-none" name="gender" label="Gender" value={sp.gender ?? ""} options={[{ value: "", label: "Any gender" }, { value: "Female", label: "Female" }, { value: "Male", label: "Male" }]} />
-        {filtered && <Button variant="ghost" size="sm" asChild><Link href={hrefWith({ team: undefined, gender: undefined })} scroll={false}>Clear filters</Link></Button>}
+        {filtered && <Button variant="ghost" size="sm" asChild><NavLink href={hrefWith({ team: undefined, gender: undefined })}>Clear filters</NavLink></Button>}
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Present this Sunday" value={s.present} delta={d(s.present, p?.present)} icon={CalendarCheck} tone="blue" hint={point.headcount && !filtered ? `Headcount ${point.headcount.total}` : undefined} />
@@ -145,11 +166,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <CardAction>
               <div className="inline-flex rounded-full border bg-card p-0.5 text-sm" role="group" aria-label="Source">
                 {(["headcount", "register"] as const).map((src) => (
-                  <Link key={src} href={hrefWith({ source: src === "register" ? "register" : undefined })} scroll={false}
+                  <NavLink key={src} href={hrefWith({ source: src === "register" ? "register" : undefined })}
                     aria-current={source === src}
                     className={cn("rounded-full px-3 py-1 font-semibold", source === src ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
                     {src === "headcount" ? "Headcount" : "Register"}
-                  </Link>
+                  </NavLink>
                 ))}
               </div>
             </CardAction>
@@ -164,13 +185,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           />
         </CardContent>
       </Card>
-
-      <Card>
+      <Card id="absent-members">
         <CardHeader>
-          <CardTitle>Absent workers ({absentWorkers.length})</CardTitle>
-          <CardDescription>Workers{filters.team ? ` in ${filters.team}` : ""} who {missed === 1 ? "weren’t here" : `missed ${missed}+ Sundays in a row`} as of {formatDate(refIso, "long")}.</CardDescription>
+          <CardTitle>Absent Members ({absentMembers.length})</CardTitle>
+          <CardDescription>
+            People not marked present on {formatDate(absDate, "long")}{absDate === lastUploaded ? " (last uploaded Sunday)" : ""}. Only people who had started attending by then are listed. These filters only affect this card.
+          </CardDescription>
         </CardHeader>
-        <CardContent><AbsentWorkers workers={absentWorkers} missed={missed} /></CardContent>
+        <CardContent>
+          <AbsentMembers
+            people={absentMembers} date={absDate} dates={[...takenDates].reverse()}
+            team={absTeam} teams={teams.map((t) => t.name)}
+            status={absStatus} statuses={settings.statuses} gender={absGender}
+          />
+        </CardContent>
       </Card>
 
       <Card>

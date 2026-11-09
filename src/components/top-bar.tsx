@@ -1,24 +1,23 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { ArrowLeft, KeyRound, LogOut, Search, UserRound } from "lucide-react"
+import { ArrowLeft, KeyRound, LogOut, UserRound } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "./theme-toggle"
+import { CommandPalette } from "./command-palette"
 import { NAV } from "./app-sidebar"
 import { logoutAction } from "@/app/(app)/actions"
 
 export function TopBar({ email, themePref }: { email: string; themePref: string }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [q, setQ] = useState("")
   const title =
     NAV.flatMap((g) => g.items)
       .filter((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
@@ -41,22 +40,7 @@ export function TopBar({ email, themePref }: { email: string; themePref: string 
         </Button>
       )}
       <h1 className="truncate text-sm font-medium md:text-base">{title}</h1>
-      <form
-        className="ml-auto hidden w-full max-w-xs md:block"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (q.trim()) router.push(`/members?q=${encodeURIComponent(q.trim())}`)
-        }}
-        role="search"
-      >
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or phone…" className="pl-8" aria-label="Search members" />
-        </div>
-      </form>
-      <Button variant="ghost" size="icon" className="ml-auto md:hidden" asChild aria-label="Search members">
-        <Link href="/members"><Search className="size-4" /></Link>
-      </Button>
+      <CommandPalette />
       <ThemeToggle accountPref={themePref} />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

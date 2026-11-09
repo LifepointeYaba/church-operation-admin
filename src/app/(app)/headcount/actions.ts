@@ -5,17 +5,14 @@ import { prisma } from "@/lib/db"
 import { audit } from "@/lib/audit"
 import { refreshData } from "@/lib/revalidate"
 import { fromIso, isoDate } from "@/lib/dates"
-import { readGrid } from "@/lib/import/csv"
-import { noteType, parseHeadcountGrid, validateHeadcount, type HeadcountValues } from "@/lib/import/headcount"
+import { noteType, validateHeadcount, type HeadcountValues } from "@/lib/import/headcount"
 import { applyHeadcounts } from "@/lib/import/apply"
-import { storeFile } from "@/lib/blob"
-
-const MAX_BYTES = 5 * 1024 * 1024
+import { REGISTER_FIELDS } from "@/lib/headcount-sync"
 
 async function existingDates(dates: string[]) {
   const rows = await prisma.serviceHeadcount.findMany({
     where: { isCurrent: true, service: { date: { in: dates.filter((d) => fromIso(d)).map((d) => new Date(`${d}T00:00:00Z`)) } } },
-    include: { service: true },
+    include: { service: true, upload: { select: { kind: true } } },
   })
   return new Map(rows.map((r) => [isoDate(r.service.date), r]))
 }
@@ -27,8 +24,17 @@ export async function saveHeadcountAction(dateIso: string, values: HeadcountValu
   const { errors, warnings } = validateHeadcount(d, v)
   if (errors.length) return { ok: false as const, error: errors.join("; ") }
   const existing = (await existingDates([dateIso])).get(dateIso)
-  if (existing && !replace) return { ok: false as const, exists: true, error: "This Sunday already has a headcount" }
   const lines = notes.split("\n").map((l) => l.trim()).filter(Boolean)
+  // Only children (or nothing) changed on a Sunday filled from an upload: update it in place so
+  // later uploads for the same Sunday can still refresh the register numbers.
+  if (existing?.upload?.kind === "attendance" && REGISTER_FIELDS.every((k) => existing[k] === v[k])) {
+    await prisma.serviceHeadcount.update({ where: { id: existing.id }, data: { children: v.children } })
+    for (const text of lines) await prisma.serviceNote.create({ data: { serviceId: existing.serviceId, type: noteType(text), text } })
+    await audit("headcount_children", "service", dateIso, { children: existing.children }, { children: v.children })
+    refreshData()
+    return { ok: true as const, warnings, replaced: false }
+  }
+  if (existing && !replace) return { ok: false as const, exists: true, error: "This Sunday already has a headcount" }
   const res = await applyHeadcounts(
     prisma,
     [{ ...v, date: dateIso, errors: [], warnings }],
@@ -38,54 +44,6 @@ export async function saveHeadcountAction(dateIso: string, values: HeadcountValu
   await audit(existing ? "headcount_replace" : "headcount_create", "service", dateIso, existing, v)
   refreshData()
   return { ok: true as const, warnings, replaced: res.replaced > 0 }
-}
-
-async function readUpload(form: FormData) {
-  const file = form.get("file")
-  if (!(file instanceof File) || file.size === 0) throw new Error("Choose a CSV or Excel file")
-  if (file.size > MAX_BYTES) throw new Error("File is larger than 5 MB")
-  const buf = Buffer.from(await file.arrayBuffer())
-  return { file, buf, parsed: parseHeadcountGrid(readGrid(buf, file.name)) }
-}
-
-export async function previewHeadcountUpload(form: FormData) {
-  await requireAdmin()
-  try {
-    const { parsed } = await readUpload(form)
-    const existing = await existingDates(parsed.rows.map((r) => r.date))
-    return {
-      ok: true as const,
-      rows: parsed.rows.map((r) => ({ ...r, existing: existing.get(r.date)?.total ?? null })),
-      notes: parsed.notes.length,
-      skippedBlocks: parsed.skippedBlocks,
-    }
-  } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : "Could not read the file" }
-  }
-}
-
-export async function commitHeadcountUpload(form: FormData, replaceDates: string[]) {
-  await requireAdmin()
-  try {
-    const { file, buf, parsed } = await readUpload(form)
-    const blobUrl = await storeFile("headcount", file.name, buf, file.type)
-    const upload = await prisma.upload.create({ data: { kind: "headcount", fileName: file.name, blobUrl, status: "processing" } })
-    const res = await applyHeadcounts(prisma, parsed.rows, parsed.notes, { uploadId: upload.id, replaceDates })
-    await prisma.upload.update({
-      where: { id: upload.id },
-      data: {
-        rowsOk: res.saved,
-        rowsFailed: res.failed,
-        status: "completed",
-        summary: { ...res, skippedBlocks: parsed.skippedBlocks, errors: parsed.rows.filter((r) => r.errors.length).map((r) => ({ date: r.date, errors: r.errors })) },
-      },
-    })
-    await audit("import", "upload", upload.id, null, res)
-    refreshData()
-    return { ok: true as const, ...res }
-  } catch (e) {
-    return { ok: false as const, error: e instanceof Error ? e.message : "Upload failed" }
-  }
 }
 
 export async function addNoteAction(dateIso: string, text: string) {

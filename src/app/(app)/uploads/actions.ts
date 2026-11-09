@@ -7,6 +7,8 @@ import { refreshData } from "@/lib/revalidate"
 import { readGrid } from "@/lib/import/csv"
 import { parseAttendanceGrid } from "@/lib/import/attendance"
 import { applyAttendanceImport, refreshDerivedMemberData } from "@/lib/import/apply"
+import { promoteFoundMembers } from "@/lib/status-progression"
+import { syncHeadcountsFromRegister } from "@/lib/headcount-sync"
 import { storeFile } from "@/lib/blob"
 import { getSettings } from "@/lib/settings"
 import type { Prisma } from "@prisma/client"
@@ -121,18 +123,19 @@ export async function commitAttendanceImport(form: FormData, createUnmatchedNoPh
     const upload = await prisma.upload.create({ data: { kind: "attendance", fileName: file.name, blobUrl, status: "processing" } })
     uploadId = upload.id
     const sum = await applyAttendanceImport(prisma, parsed, { createUnmatchedNoPhone })
+    const headcount = await syncHeadcountsFromRegister(prisma, serviceDates, upload.id)
     await prisma.upload.update({
       where: { id: upload.id },
       data: {
         rowsOk: parsed.people.length - sum.membersNeedingConfirm.length - sum.membersPendingApproval.length,
         rowsFailed: sum.rejected.length + sum.membersNeedingConfirm.length,
         status: sum.membersPendingApproval.length || sum.membersNeedingConfirm.length ? "needs review" : "completed",
-        summary: { ...sum, fileHash, serviceDates, reimport: duplicate.blocked },
+        summary: { ...sum, headcount, fileHash, serviceDates, reimport: duplicate.blocked },
       },
     })
     await audit("import", "upload", upload.id, null, { ...sum, reimport: duplicate.blocked })
     refreshData()
-    return { ok: true as const, ...sum }
+    return { ok: true as const, ...sum, headcount }
   } catch (e) {
     const error = e instanceof Error ? e.message : "Import failed"
     if (uploadId !== null) {
@@ -281,11 +284,12 @@ export async function resolvePendingAttendanceImport(
     let approvedMemberCreated = false
     let approvedMemberUpdated = false
     let approvedMarksAdded = 0
+    let approvedPromoted = 0
     if (decision === "approve") {
       const settings = await getSettings()
       if (selectedMemberId === undefined && !settings.statuses.includes(status)) throw new Error("Choose a valid member status")
       const updatedCandidate = { ...candidate, status }
-      const { member, created, updated, marksAdded } = await prisma.$transaction(async (tx) => {
+      const { member, created, updated, marksAdded, promoted } = await prisma.$transaction(async (tx) => {
         let existing: { id: number; firstName: string; lastName: string; nameKey: string; phone: string | null; phoneKey: string | null; altPhone: string | null; email: string | null; gender: string | null; personResponsible: string | null } | null = null
         if (selectedMemberId !== undefined) {
           existing = await tx.member.findFirst({
@@ -357,12 +361,19 @@ export async function resolvePendingAttendanceImport(
           })
           marksAdded += result.count
         }
-        return { member: saved, created: !existing, updated, marksAdded }
+        // A merged existing person who gained a new Sunday moves up a stage.
+        const promoted = existing && marksAdded > 0
+          ? await promoteFoundMembers(tx, [existing.id], "Attended again (merged during import review)")
+          : 0
+        return { member: saved, created: !existing, updated, marksAdded, promoted }
       })
       approvedMemberCreated = created
       approvedMemberUpdated = updated
       approvedMarksAdded = marksAdded
+      approvedPromoted = promoted
       await refreshDerivedMemberData(prisma)
+      // Keep the weekly headcount in step with the attendance this merge added.
+      if (marksAdded > 0) await syncHeadcountsFromRegister(prisma, candidate.present, uploadId)
       await audit("import_approve", "member", member.id, null, { uploadId, row })
     } else {
       await audit("import_reject", "upload", uploadId, null, { row, name: `${candidate.firstName} ${candidate.lastName}`.trim() })
@@ -378,6 +389,7 @@ export async function resolvePendingAttendanceImport(
           membersAdded: Number(summary.membersAdded ?? 0) + (approvedMemberCreated ? 1 : 0),
           membersUpdated: Number(summary.membersUpdated ?? 0) + (approvedMemberUpdated ? 1 : 0),
           attendanceAdded: Number(summary.attendanceAdded ?? 0) + approvedMarksAdded,
+          membersPromoted: Number(summary.membersPromoted ?? 0) + approvedPromoted,
           }),
     }
     await prisma.upload.update({

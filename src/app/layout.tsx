@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next"
 import { Geist_Mono, Nunito, Quicksand } from "next/font/google"
 import { ThemeProvider } from "next-themes"
-import { Toaster } from "@/components/ui/sonner"
+import { Notifications } from "@/components/notifications"
+import { Providers } from "@/components/providers"
 import "./globals.css"
 
 const nunito = Nunito({ variable: "--font-nunito", subsets: ["latin"], weight: ["400", "600", "700"] })
@@ -26,8 +27,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning className={`${nunito.variable} ${quicksand.variable} ${geistMono.variable}`}>
       <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
-          <Toaster richColors position="top-center" />
+          <Providers>{children}</Providers>
+          <Notifications />
         </ThemeProvider>
       </body>
     </html>
