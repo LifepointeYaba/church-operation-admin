@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client"
-import type { AttendanceParseResult } from "./attendance"
+import type { AttendanceParseResult, ParsedPerson } from "./attendance"
+import { matchAttendancePerson } from "./matching"
 import type { HeadcountRow, ParsedNote } from "./headcount"
 
 type Db = PrismaClient
@@ -8,6 +9,7 @@ export type ImportSummary = {
   membersAdded: number
   membersUpdated: number
   membersNeedingConfirm: { row: number; name: string }[]
+  membersPendingApproval: { row: number; person: ParsedPerson }[]
   servicesAdded: number
   attendanceAdded: number
   rejected: { row?: number; header?: string; reason: string }[]
@@ -44,6 +46,7 @@ export async function applyAttendanceImport(
     membersAdded: 0,
     membersUpdated: 0,
     membersNeedingConfirm: [],
+    membersPendingApproval: [],
     servicesAdded: 0,
     attendanceAdded: 0,
     rejected: [
@@ -62,25 +65,19 @@ export async function applyAttendanceImport(
 
   // Existing members
   const existing = await db.member.findMany({
+    where: { deletedAt: null },
     select: { id: true, nameKey: true, phoneKey: true, email: true, gender: true, personResponsible: true, lastName: true },
   })
-  const byKey = new Map(existing.filter((m) => m.phoneKey).map((m) => [`${m.nameKey}|${m.phoneKey}`, m]))
-  const noPhoneByName = new Map<string, typeof existing>()
-  existing.filter((m) => !m.phoneKey).forEach((m) => noPhoneByName.set(m.nameKey, [...(noPhoneByName.get(m.nameKey) ?? []), m]))
-
   const idForRow = new Map<number, number>()
   const toCreate: typeof parsed.people = []
 
   for (const p of parsed.people) {
-    let match = p.phoneKey ? byKey.get(`${p.nameKey}|${p.phoneKey}`) : undefined
-    if (!p.phoneKey) {
-      const cands = noPhoneByName.get(p.nameKey) ?? []
-      if (cands.length === 1) match = cands[0]
-      else if (cands.length > 1 && !opts.createUnmatchedNoPhone) {
-        summary.membersNeedingConfirm.push({ row: p.row, name: `${p.firstName} ${p.lastName}`.trim() })
-        continue
-      }
+    const result = matchAttendancePerson(p, existing)
+    if (result.kind === "ambiguous" && (result.reason === "contact" || !opts.createUnmatchedNoPhone)) {
+      summary.membersNeedingConfirm.push({ row: p.row, name: `${p.firstName} ${p.lastName}`.trim() })
+      continue
     }
+    const match = result.kind === "matched" ? result.member : undefined
     if (match) {
       idForRow.set(p.row, match.id)
       const data: Prisma.MemberUpdateInput = {}
@@ -91,6 +88,8 @@ export async function applyAttendanceImport(
         await db.member.update({ where: { id: match.id }, data })
         summary.membersUpdated++
       }
+    } else if (p.firstTime === false) {
+      summary.membersPendingApproval.push({ row: p.row, person: p })
     } else {
       toCreate.push(p)
     }

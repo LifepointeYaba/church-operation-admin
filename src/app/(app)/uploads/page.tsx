@@ -1,7 +1,9 @@
 import { Download } from "lucide-react"
+import { Prisma } from "@prisma/client"
 import { requireAdmin } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { blobConfigured } from "@/lib/blob"
+import { getSettings } from "@/lib/settings"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -9,12 +11,32 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { EmptyState, PageHeader } from "@/components/common"
 import { AttendanceImport } from "./import-client"
+import { PendingAttendanceReviews } from "./pending-reviews"
 
 export const metadata = { title: "Uploads & import" }
 
 export default async function UploadsPage() {
   await requireAdmin()
-  const uploads = await prisma.upload.findMany({ orderBy: { uploadedAt: "desc" }, take: 200 })
+  const [uploads, settings] = await Promise.all([
+    prisma.upload.findMany({ orderBy: { uploadedAt: "desc" }, take: 200 }),
+    getSettings(),
+  ])
+  const pendingUploads = uploads.flatMap((upload) => {
+    const summary = upload.summary
+    if (!summary || typeof summary !== "object" || Array.isArray(summary)) return []
+    const pending = (summary as Prisma.JsonObject).membersPendingApproval
+    if (!Array.isArray(pending)) return []
+    const people = pending.flatMap((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return []
+      const entry = item as Prisma.JsonObject
+      const person = entry.person
+      if (!person || typeof person !== "object" || Array.isArray(person)) return []
+      const details = person as Prisma.JsonObject
+      if (typeof entry.row !== "number" || typeof details.firstName !== "string" || typeof details.lastName !== "string") return []
+      return [{ row: entry.row, name: `${details.firstName} ${details.lastName}`.trim() }]
+    })
+    return people.length ? [{ id: upload.id, fileName: upload.fileName, people }] : []
+  })
   return (
     <div className="stagger space-y-4">
       <PageHeader title="Uploads & import" description="Re-importing updates matching people (name + phone) and Sundays instead of duplicating them." />
@@ -24,10 +46,19 @@ export default async function UploadsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Import attendance file</CardTitle>
-          <CardDescription>Columns: First Name, Last Name, Phone number, Email, Team, Status, Person Responsible, Gender, then one TRUE/FALSE column per Sunday (dd-Mon-yy).</CardDescription>
+          <CardDescription>Upload the standard sheet with one TRUE/FALSE column per Sunday, or a weekly sheet with Name, Phone, Gender, and First Time (Yes/No). For weekly sheets, select the Sunday date above; the first word in Name is treated as the first name. Yes creates a First Timer record. No updates a matching person; unmatched people wait for approval or rejection below.</CardDescription>
         </CardHeader>
         <CardContent><AttendanceImport /></CardContent>
       </Card>
+      {pendingUploads.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Pending member approvals</CardTitle>
+            <CardDescription>These attendees were marked First Time = No but did not match a registered person. Approve to create a member and record attendance, or reject to leave them out.</CardDescription>
+          </CardHeader>
+          <CardContent><PendingAttendanceReviews uploads={pendingUploads} statuses={settings.statuses} /></CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader><CardTitle className="text-base">Upload history</CardTitle></CardHeader>
         <CardContent className="px-0">

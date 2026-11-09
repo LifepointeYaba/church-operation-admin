@@ -19,6 +19,7 @@ export type ParsedPerson = {
   personResponsible: string | null
   gender: string | null
   flags: string[]
+  firstTime?: boolean
   /** ISO dates the person was marked present. */
   present: string[]
 }
@@ -39,6 +40,8 @@ const COLS = {
   status: ["status"],
   responsible: ["person responsible", "responsible"],
   gender: ["gender", "sex"],
+  name: ["name"],
+  firstTime: ["first time", "first-time"],
 }
 
 function findCol(headers: string[], names: string[]) {
@@ -74,18 +77,24 @@ export function flagsFor(p: { lastName: string; gender: string | null; phoneProb
   return flags
 }
 
-export function parseAttendanceGrid(grid: string[][], today = todayLagos()): AttendanceParseResult {
+export function parseAttendanceGrid(grid: string[][], today = todayLagos(), sundayDate?: string): AttendanceParseResult {
   const [headerRow, ...rows] = grid
+  if (!headerRow) throw new Error("The file is empty")
   const headers = headerRow.map((h) => h.trim())
+  const nameCol = findCol(headers, COLS.name)
+  const firstTimeCol = findCol(headers, COLS.firstTime)
+  const weeklyFormat = nameCol >= 0 && firstTimeCol >= 0
   const idx = {
-    first: findCol(headers, COLS.first),
-    last: findCol(headers, COLS.last),
+    first: weeklyFormat ? nameCol : findCol(headers, COLS.first),
+    last: weeklyFormat ? -1 : findCol(headers, COLS.last),
     phone: findCol(headers, COLS.phone),
     email: findCol(headers, COLS.email),
     team: findCol(headers, COLS.team),
     status: findCol(headers, COLS.status),
     responsible: findCol(headers, COLS.responsible),
     gender: findCol(headers, COLS.gender),
+    name: nameCol,
+    firstTime: firstTimeCol,
   }
   if (idx.first < 0) throw new Error("Missing 'First Name' column")
 
@@ -93,8 +102,17 @@ export function parseAttendanceGrid(grid: string[][], today = todayLagos()): Att
   const dateCols: { col: number; iso: string }[] = []
   const seen = new Set<string>()
   const known = new Set(Object.values(idx).filter((i) => i >= 0))
+  if (weeklyFormat) {
+    if (!sundayDate) throw new Error("Select the Sunday date for this weekly attendance file")
+    const date = parseSheetDate(sundayDate)
+    if (!date) throw new Error("Enter a valid Sunday date")
+    const check = checkServiceDate(date, today)
+    if (!check.ok) throw new Error(check.reason)
+    dateCols.push({ col: -1, iso: isoDate(date) })
+  }
   headers.forEach((h, col) => {
     if (known.has(col) || !h) return
+    if (weeklyFormat) return rejectedColumns.push({ header: h, reason: "Not a recognised column" })
     const d = parseSheetDate(h)
     if (!d) return rejectedColumns.push({ header: h, reason: "Not a recognised date" })
     const check = checkServiceDate(d, today)
@@ -114,9 +132,18 @@ export function parseAttendanceGrid(grid: string[][], today = todayLagos()): Att
   rows.forEach((r, i) => {
     const rowNo = i + 2
     if (r.every((c) => !c.trim())) return
-    const firstName = cleanName(get(r, idx.first))
-    const lastName = cleanName(get(r, idx.last))
+    const fullName = cleanName(get(r, idx.first))
+    const [firstName, ...lastParts] = weeklyFormat ? fullName.split(" ") : [fullName]
+    const lastName = cleanName(weeklyFormat ? lastParts.join(" ") : get(r, idx.last))
     if (!firstName && !lastName) return rejectedRows.push({ row: rowNo, reason: "No name" })
+    let firstTime: boolean | undefined
+    if (weeklyFormat) {
+      const value = get(r, idx.firstTime).toLowerCase()
+      if (value !== "yes" && value !== "no") {
+        return rejectedRows.push({ row: rowNo, reason: "First Time must be Yes or No" })
+      }
+      firstTime = value === "yes"
+    }
     const ph = normalizePhone(get(r, idx.phone))
     const gender = cleanGender(get(r, idx.gender))
     const key = `${nameKey(firstName, lastName)}|${ph.phoneKey ?? ""}`
@@ -125,7 +152,7 @@ export function parseAttendanceGrid(grid: string[][], today = todayLagos()): Att
     }
     keysSeen.set(key, rowNo)
     const present = dateCols
-      .filter((d) => /^(true|yes|y|1|x|present|p)$/i.test(get(r, d.col)))
+      .filter((d) => weeklyFormat || /^(true|yes|y|1|x|present|p)$/i.test(get(r, d.col)))
       .map((d) => d.iso)
       .filter((iso) => !NO_RECORD_DATES.includes(iso))
     present.forEach((iso) => counts.set(iso, (counts.get(iso) ?? 0) + 1))
@@ -138,10 +165,11 @@ export function parseAttendanceGrid(grid: string[][], today = todayLagos()): Att
       phoneKey: ph.phoneKey,
       email: cleanEmail(get(r, idx.email)),
       teams: splitTeams(get(r, idx.team)),
-      status: cleanName(get(r, idx.status)) || "First Timer",
+      status: cleanName(get(r, idx.status)) || (firstTime === true ? "First Timer" : weeklyFormat ? "" : "First Timer"),
       personResponsible: cleanName(get(r, idx.responsible)) || null,
       gender,
       flags: flagsFor({ lastName: firstName ? lastName : "", gender, phoneProblem: ph.problem }),
+      firstTime,
       present,
     })
   })

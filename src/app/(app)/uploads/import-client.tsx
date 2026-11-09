@@ -16,6 +16,7 @@ type Done = Extract<Awaited<ReturnType<typeof commitAttendanceImport>>, { ok: tr
 export function AttendanceImport() {
   const router = useRouter()
   const [file, setFile] = useState<File | null>(null)
+  const [sundayDate, setSundayDate] = useState("")
   const [preview, setPreview] = useState<Preview | null>(null)
   const [done, setDone] = useState<Done | null>(null)
   const [createNoPhone, setCreateNoPhone] = useState(false)
@@ -23,6 +24,7 @@ export function AttendanceImport() {
   const fd = () => {
     const f = new FormData()
     f.set("file", file!)
+    f.set("sundayDate", sundayDate)
     return f
   }
   return (
@@ -35,17 +37,43 @@ export function AttendanceImport() {
           setPreview(r)
         })}><Upload className="size-4" /> Preview</Button>
       </div>
+      <div className="max-w-xs space-y-1">
+        <label htmlFor="weekly-sunday-date" className="text-sm font-medium">Sunday date for weekly files</label>
+        <Input id="weekly-sunday-date" type="date" value={sundayDate} onChange={(e) => { setSundayDate(e.target.value); setPreview(null); setDone(null) }} />
+      </div>
       {preview && (
         <div className="space-y-3 rounded-lg border p-4 text-sm">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="People in file" v={preview.people} />
             <Stat label="Already registered" v={preview.matched} />
             <Stat label="New people" v={preview.added} />
+            <Stat label="Need approval" v={preview.pendingApproval.length} />
+            <Stat label="Need match review" v={preview.needsConfirm.length} />
             <Stat label="Need fixing" v={preview.flagged} />
             <Stat label="Sundays" v={preview.sundays} />
             <Stat label="New Sundays" v={preview.newSundays} />
             <Stat label="Present marks" v={preview.marks} />
           </div>
+          {preview.pendingApproval.length > 0 && (
+            <Alert>
+              <AlertDescription>
+                <p className="font-medium">Unmatched existing attendees will wait for approval after import</p>
+                <ul className="list-disc pl-4">
+                  {preview.pendingApproval.map((person) => <li key={person.row}>{person.name} (row {person.row})</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+          {preview.needsConfirm.length > 0 && (
+            <Alert>
+              <AlertDescription>
+                <p className="font-medium">Some contact details match multiple registered people</p>
+                <ul className="list-disc pl-4">
+                  {preview.needsConfirm.map((person) => <li key={person.row}>{person.name} (row {person.row})</li>)}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
           {[...preview.rejectedColumns.map((c) => `Column “${c.header}”: ${c.reason}`), ...preview.rejectedRows.map((r) => `Row ${r.row}: ${r.reason}`)].length > 0 && (
             <Alert>
               <AlertDescription>
