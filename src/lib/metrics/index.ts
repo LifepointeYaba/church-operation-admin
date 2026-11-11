@@ -42,7 +42,7 @@ export type ServicePoint = {
   present: number
   headcount: null | {
     workers: number; members: number; firstTimers: number; secondTimers: number
-    male: number; female: number; children: number; total: number
+    male: number; female: number; children: number; guests: number; total: number
   }
 }
 
@@ -143,9 +143,10 @@ export const missedInARow = (m: MemberStat) => (m.lastRn == null ? null : m.last
 async function _servicePoints(): Promise<ServicePoint[]> {
   const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
     SELECT s.id, s.date, s.record_taken,
-      (SELECT COUNT(*)::int FROM attendance a JOIN members m ON m.id = a.member_id
-        WHERE a.service_id = s.id AND m.deleted_at IS NULL) AS present,
-      h.workers, h.members, h.first_timers, h.second_timers, h.male, h.female, h.children, h.total
+      -- Present = the weekly headcount total when the Sunday has one, so both numbers always agree.
+      COALESCE(h.total, (SELECT COUNT(*)::int FROM attendance a JOIN members m ON m.id = a.member_id
+        WHERE a.service_id = s.id AND m.deleted_at IS NULL)) AS present,
+      h.workers, h.members, h.first_timers, h.second_timers, h.male, h.female, h.children, h.guests, h.total
     FROM services s
     LEFT JOIN service_headcounts h ON h.service_id = s.id AND h.is_current
     ORDER BY s.date`
@@ -160,7 +161,7 @@ async function _servicePoints(): Promise<ServicePoint[]> {
         : {
             workers: r.workers as number, members: r.members as number,
             firstTimers: r.first_timers as number, secondTimers: r.second_timers as number,
-            male: r.male as number, female: r.female as number, children: r.children as number,
+            male: r.male as number, female: r.female as number, children: r.children as number, guests: r.guests as number,
             total: r.total as number,
           },
   }))

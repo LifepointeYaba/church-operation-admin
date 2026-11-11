@@ -9,16 +9,22 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  passwordHash   String    @map("password_hash")
-  role           String    @default("super_admin")
-  themePref      String    @default("system") @map("theme_pref")
-  failedAttempts Int       @default(0) @map("failed_attempts")
-  lockedUntil    DateTime? @map("locked_until")
-  lastLogin      DateTime? @map("last_login")
-  passwordChangedAt DateTime @default(now()) @map("password_changed_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  name                  String?
+  passwordHash          String    @map("password_hash")
+  role                  String    @default("viewer")
+  themePref             String    @default("system") @map("theme_pref")
+  failedAttempts        Int       @default(0) @map("failed_attempts")
+  lockedUntil           DateTime? @map("locked_until")
+  lastLogin             DateTime? @map("last_login")
+  passwordChangedAt     DateTime  @default(now()) @map("password_changed_at")
+  /// Set when an admin creates the account or generates a new password: the user must choose their own on next sign-in.
+  mustChangePassword    Boolean   @default(false) @map("must_change_password")
+  /// A generated (temporary) password stops working after this time.
+  tempPasswordExpiresAt DateTime? @map("temp_password_expires_at")
+  createdById           String?   @map("created_by_id")
+  createdAt             DateTime  @default(now()) @map("created_at")
 
   resetTokens PasswordResetToken[]
 
@@ -57,7 +63,7 @@ model Member {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  firstSeenService Service?        @relation("FirstSeen", fields: [firstSeenServiceId], references: [id], onDelete: SetNull)
+  firstSeenService Service?           @relation("FirstSeen", fields: [firstSeenServiceId], references: [id], onDelete: SetNull)
   teams            MemberTeam[]
   attendance       Attendance[]
   statusHistory    StatusHistory[]
@@ -115,24 +121,26 @@ model Attendance {
 }
 
 model ServiceHeadcount {
-  id            Int      @id @default(autoincrement())
-  serviceId     Int      @map("service_id")
-  workers       Int
-  members       Int
-  firstTimers   Int      @map("first_timers")
-  secondTimers  Int      @map("second_timers")
-  male          Int
-  female        Int
-  children      Int
-  total         Int
-  uploadId      Int?     @map("upload_id")
-  version       Int      @default(1)
-  isCurrent     Boolean  @default(true) @map("is_current")
+  id           Int      @id @default(autoincrement())
+  serviceId    Int      @map("service_id")
+  workers      Int
+  members      Int
+  firstTimers  Int      @map("first_timers")
+  secondTimers Int      @map("second_timers")
+  male         Int
+  female       Int
+  children     Int
+  /// Guests, pastors and visitors not in the register (entered by hand).
+  guests       Int      @default(0)
+  total        Int
+  uploadId     Int?     @map("upload_id")
+  version      Int      @default(1)
+  isCurrent    Boolean  @default(true) @map("is_current")
   /// Kept in step with the attendance register (filled from an upload or from marking attendance).
-  fromRegister  Boolean  @default(false) @map("from_register")
-  createdAt     DateTime @default(now()) @map("created_at")
-  service       Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  upload        Upload?  @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+  fromRegister Boolean  @default(false) @map("from_register")
+  createdAt    DateTime @default(now()) @map("created_at")
+  service      Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  upload       Upload?  @relation(fields: [uploadId], references: [id], onDelete: SetNull)
 
   @@index([serviceId, isCurrent])
   @@map("service_headcounts")
@@ -215,16 +223,20 @@ model StatusSuggestion {
 }
 
 model AuditLog {
-  id       Int      @id @default(autoincrement())
-  action   String
-  entity   String
-  entityId String?  @map("entity_id")
-  before   Json?
-  after    Json?
-  at       DateTime @default(now())
-  ip       String?
+  id         Int      @id @default(autoincrement())
+  action     String
+  entity     String
+  entityId   String?  @map("entity_id")
+  before     Json?
+  after      Json?
+  at         DateTime @default(now())
+  ip         String?
+  /// Who did it. Email is copied so the entry survives the user being deleted.
+  actorId    String?  @map("actor_id")
+  actorEmail String?  @map("actor_email")
 
   @@index([at])
+  @@index([actorId])
   @@index([entity, entityId])
   @@map("audit_log")
 }

@@ -1,12 +1,11 @@
 "use server"
 
 import { z } from "zod"
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { audit } from "@/lib/audit"
 import { refreshData } from "@/lib/revalidate"
 import { getSettings, saveSetting } from "@/lib/settings"
-import { hashPassword, passwordProblem, verifyPassword } from "@/lib/password"
 import { cleanName } from "@/lib/keys"
 
 const thresholds = z.object({
@@ -17,7 +16,7 @@ const thresholds = z.object({
 })
 
 export async function saveThresholdsAction(input: z.input<typeof thresholds>) {
-  await requireAdmin()
+  await requirePermission("settings.manage")
   const v = thresholds.safeParse(input)
   if (!v.success) return { ok: false, error: "Enter whole numbers in range" }
   if (v.data.inactiveWeeks <= v.data.atRiskWeeks) return { ok: false, error: "Inactive must be more weeks than at risk" }
@@ -29,7 +28,7 @@ export async function saveThresholdsAction(input: z.input<typeof thresholds>) {
 }
 
 export async function saveStatusesAction(list: string[]) {
-  await requireAdmin()
+  await requirePermission("settings.manage")
   const statuses = [...new Set(list.map(cleanName).filter(Boolean))]
   if (!statuses.length) return { ok: false, error: "Keep at least one status" }
   const inUse = await prisma.member.groupBy({ by: ["status"], where: { status: { notIn: statuses } }, _count: true })
@@ -42,7 +41,7 @@ export async function saveStatusesAction(list: string[]) {
 }
 
 export async function renameTeamAction(id: number, name: string) {
-  await requireAdmin()
+  await requirePermission("settings.manage")
   const n = cleanName(name)
   if (!n) return { ok: false, error: "Enter a name" }
   const before = await prisma.team.findUniqueOrThrow({ where: { id } })
@@ -61,7 +60,7 @@ export async function renameTeamAction(id: number, name: string) {
 }
 
 export async function addTeamAction(name: string) {
-  await requireAdmin()
+  await requirePermission("settings.manage")
   const n = cleanName(name)
   if (!n) return { ok: false, error: "Enter a name" }
   await prisma.team.upsert({ where: { name: n }, create: { name: n }, update: {} })
@@ -71,21 +70,9 @@ export async function addTeamAction(name: string) {
 }
 
 export async function deleteTeamAction(id: number) {
-  await requireAdmin()
+  await requirePermission("settings.manage")
   const t = await prisma.team.delete({ where: { id } })
   await audit("team_delete", "team", id, t, null)
   refreshData()
-  return { ok: true }
-}
-
-export async function changePasswordAction(current: string, next: string, confirm: string) {
-  const admin = await requireAdmin()
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: admin.id } })
-  if (!(await verifyPassword(user.passwordHash, current))) return { ok: false, error: "Current password is incorrect" }
-  const problem = passwordProblem(next)
-  if (problem) return { ok: false, error: problem }
-  if (next !== confirm) return { ok: false, error: "New passwords do not match" }
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next), passwordChangedAt: new Date() } })
-  await audit("password_change", "user", user.id)
   return { ok: true }
 }

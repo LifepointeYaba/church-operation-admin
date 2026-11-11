@@ -31,7 +31,7 @@ export function RequestResetForm() {
     <Card>
       <CardHeader>
         <CardTitle>Reset password</CardTitle>
-        <CardDescription>We will email a one-time link to the Super Admin address.</CardDescription>
+        <CardDescription>We will email a one-time link to your account address.</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={action} className="space-y-4">

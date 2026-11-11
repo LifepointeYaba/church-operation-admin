@@ -1,11 +1,11 @@
-import { requireAdminApi } from "@/lib/auth"
+import { requirePermissionApi } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { audit } from "@/lib/audit"
 import { isoDate } from "@/lib/dates"
 
 /** Everything held about one person (data-subject request). */
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdminApi()
+  const admin = await requirePermissionApi("members.export")
   if (admin instanceof Response) return admin
   const id = Number((await params).id)
   const m = await prisma.member.findUnique({

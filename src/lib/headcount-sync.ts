@@ -3,7 +3,7 @@ import { registerBreakdownNow, type Breakdown } from "./metrics/breakdown"
 import { computeTotal } from "./import/headcount"
 import { isoDate } from "./dates"
 
-/** Fields of the weekly headcount that come from the attendance register. Children are always entered by hand. */
+/** Fields of the weekly headcount that come from the attendance register. Children and guests/pastors are always entered by hand. */
 export const REGISTER_FIELDS = ["workers", "members", "firstTimers", "secondTimers", "male", "female"] as const
 type RegisterValues = Record<(typeof REGISTER_FIELDS)[number], number>
 
@@ -17,12 +17,12 @@ export function followsRegister(h: { fromRegister: boolean; upload?: { kind: str
 const pick = (b: Breakdown): RegisterValues =>
   Object.fromEntries(REGISTER_FIELDS.map((k) => [k, b[k] as number])) as RegisterValues
 
-const ZERO: Breakdown = { workers: 0, members: 0, firstTimers: 0, secondTimers: 0, total: 0, male: 0, female: 0, children: null }
+const ZERO: Breakdown = { workers: 0, members: 0, firstTimers: 0, secondTimers: 0, total: 0, male: 0, female: 0, children: null, guests: null }
 
 /**
  * Fill each Sunday's weekly headcount from the attendance register after an upload.
  * - No headcount yet → create one (children 0).
- * - Headcount that follows the register → refresh the register numbers, keep children.
+ * - Headcount that follows the register → refresh the register numbers, keep children and guests.
  * - Headcount entered by hand or from the Chart sheet → leave it alone.
  */
 export async function syncHeadcountsFromRegister(db: PrismaClient, dates: string[], uploadId: number): Promise<HeadcountSyncResult> {
@@ -35,12 +35,12 @@ export async function syncHeadcountsFromRegister(db: PrismaClient, dates: string
     if (!numbers) continue
     const service = await db.service.findUnique({
       where: { date: new Date(`${date}T00:00:00.000Z`) },
-      select: { id: true, headcounts: { where: { isCurrent: true }, select: { id: true, fromRegister: true, upload: { select: { kind: true } } } } },
+      select: { id: true, headcounts: { where: { isCurrent: true }, select: { id: true, fromRegister: true, children: true, guests: true, upload: { select: { kind: true } } } } },
     })
     if (!service) continue
     const values = pick(numbers)
-    const total = computeTotal(values)
     const current = service.headcounts[0]
+    const total = computeTotal({ ...values, children: current?.children, guests: current?.guests })
     if (!current) {
       await db.serviceHeadcount.create({ data: { ...values, children: 0, total, serviceId: service.id, uploadId, fromRegister: true } })
       res.created.push(date)
@@ -78,7 +78,7 @@ export async function syncHeadcountsForMark(db: Prisma.TransactionClient, member
 
   const services = await db.service.findMany({
     where: { date: { in: dates.map((d) => new Date(`${d}T00:00:00.000Z`)) } },
-    select: { id: true, date: true, recordTaken: true, headcounts: { where: { isCurrent: true }, select: { id: true, fromRegister: true, workers: true, members: true, firstTimers: true, secondTimers: true, total: true, male: true, female: true, upload: { select: { kind: true } } } } },
+    select: { id: true, date: true, recordTaken: true, headcounts: { where: { isCurrent: true }, select: { id: true, fromRegister: true, workers: true, members: true, firstTimers: true, secondTimers: true, total: true, male: true, female: true, children: true, guests: true, upload: { select: { kind: true } } } } },
   })
   for (const svc of services) {
     const date = isoDate(svc.date)
@@ -88,7 +88,7 @@ export async function syncHeadcountsForMark(db: Prisma.TransactionClient, member
     if (!current || followsRegister(current)) {
       if (!svc.recordTaken) continue
       const values = pick(a)
-      const total = computeTotal(values)
+      const total = computeTotal({ ...values, children: current?.children, guests: current?.guests })
       if (current) await db.serviceHeadcount.update({ where: { id: current.id }, data: { ...values, total, fromRegister: true } })
       else if (a.total > 0) await db.serviceHeadcount.create({ data: { ...values, children: 0, total, serviceId: svc.id, fromRegister: true } })
       continue

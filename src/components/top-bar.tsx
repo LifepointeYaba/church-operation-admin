@@ -15,14 +15,14 @@ import { CommandPalette } from "./command-palette"
 import { NAV } from "./app-sidebar"
 import { logoutAction } from "@/app/(app)/actions"
 
-export function TopBar({ email, themePref }: { email: string; themePref: string }) {
+export function TopBar({ email, name, role, themePref }: { email: string; name: string | null; role: string; themePref: string }) {
   const pathname = usePathname()
   const router = useRouter()
   const title =
     NAV.flatMap((g) => g.items)
       .filter((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
       .sort((a, b) => b.href.length - a.href.length)[0]?.label ??
-    (pathname.startsWith("/members/") ? "Member profile" : "")
+    (pathname.startsWith("/members/") ? "Member profile" : pathname === "/account" ? "My account" : "")
   // Sub-pages (e.g. /members/12, /settings/audit) get a back button.
   const parent = pathname.split("/").filter(Boolean).length > 1 ? pathname.slice(0, pathname.lastIndexOf("/")) : null
   const parentLabel = parent ? NAV.flatMap((g) => g.items).find((i) => i.href === parent)?.label ?? "Back" : null
@@ -47,10 +47,17 @@ export function TopBar({ email, themePref }: { email: string; themePref: string 
           <Button variant="ghost" size="icon" aria-label="Account"><UserRound className="size-4" /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="truncate font-normal text-muted-foreground">{email}</DropdownMenuLabel>
+          <DropdownMenuLabel className="font-normal">
+            {name && <div className="truncate font-medium">{name}</div>}
+            <div className="truncate text-muted-foreground">{email}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{role}</div>
+          </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/settings#password"><KeyRound className="size-4" /> Change password</Link>
+            <Link href="/account"><UserRound className="size-4" /> My account</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/account#password"><KeyRound className="size-4" /> Change password</Link>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void logoutAction()}>
             <LogOut className="size-4" /> Log out

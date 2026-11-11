@@ -18,15 +18,17 @@ import { addNoteAction, deleteNoteAction, saveHeadcountAction } from "./actions"
 
 const FIELDS = [
   ["workers", "Workers"], ["members", "Members"], ["firstTimers", "First timers"], ["secondTimers", "Second timers"],
-  ["male", "Male"], ["female", "Female"], ["children", "Children (enter by hand)"],
+  ["male", "Male"], ["female", "Female"], ["children", "Children"], ["guests", "Guests & pastors"],
 ] as const
+/** Added by hand on top of the register; left blank means 0. */
+const HAND_KEYS = ["children", "guests"] as const
 
 const REGISTER_KEYS = ["workers", "members", "firstTimers", "secondTimers", "male", "female"] as const
 export type RegisterNumbers = Record<(typeof REGISTER_KEYS)[number], number>
 export type HeadcountSource = "upload" | "manual" | "chart"
 
 const SOURCE_TEXT: Record<HeadcountSource, string> = {
-  upload: "Filled automatically from the attendance upload. Add children, or change any number if needed.",
+  upload: "Filled automatically from the attendance upload. Add children and guests/pastors; they stay when the next upload refreshes the rest.",
   manual: "Entered by hand. Later uploads won’t change it; use “Fill from register” to pull in the latest upload numbers.",
   chart: "From the Chart sheet. Use “Fill from register” to replace with numbers from the attendance upload.",
 }
@@ -35,8 +37,8 @@ export function HeadcountForm({ date, dates, existing, registered, register, sou
   date: string; dates: string[]; existing: HeadcountValues | null; registered: number
   register: RegisterNumbers | null; source: HeadcountSource | null
 }) {
-  const blank = { workers: "", members: "", firstTimers: "", secondTimers: "", male: "", female: "", children: "" }
-  // No headcount yet: start from the attendance register so only children need typing.
+  const blank = { workers: "", members: "", firstTimers: "", secondTimers: "", male: "", female: "", children: "", guests: "" }
+  // No headcount yet: start from the attendance register so only children and guests need typing.
   const initial = existing
     ? Object.fromEntries(FIELDS.map(([k]) => [k, String(existing[k])]))
     : register ? { ...blank, ...Object.fromEntries(REGISTER_KEYS.map((k) => [k, String(register[k])])) } : blank
@@ -46,9 +48,10 @@ export function HeadcountForm({ date, dates, existing, registered, register, sou
   const [confirmReplace, setConfirmReplace] = useState(false)
   const nav = useNavigation()
   const n = (k: string) => (v[k] === "" ? 0 : Number(v[k]))
-  const total = n("workers") + n("members") + n("firstTimers") + n("secondTimers")
-  const byGender = n("male") + n("female") + n("children")
-  const filled = FIELDS.every(([k]) => v[k] !== "")
+  const registerSum = n("workers") + n("members") + n("firstTimers") + n("secondTimers")
+  const total = registerSum + n("children") + n("guests")
+  const byGender = n("male") + n("female") + n("children") + n("guests")
+  const filled = FIELDS.every(([k]) => v[k] !== "" || (HAND_KEYS as readonly string[]).includes(k))
 
   const mutation = useActionMutation(
     (replace: boolean) => {
@@ -88,18 +91,21 @@ export function HeadcountForm({ date, dates, existing, registered, register, sou
           <div key={k} className="space-y-1.5">
             <Label htmlFor={`hc-${k}`}>{label}</Label>
             <Input id={`hc-${k}`} inputMode="numeric" pattern="[0-9]*" className="h-11 text-base tabular-nums" value={v[k]}
-              onChange={(e) => setV({ ...v, [k]: e.target.value.replace(/\D/g, "") })} required />
+              placeholder={(HAND_KEYS as readonly string[]).includes(k) ? "0" : undefined}
+              onChange={(e) => setV({ ...v, [k]: e.target.value.replace(/\D/g, "") })} required={!(HAND_KEYS as readonly string[]).includes(k)} />
           </div>
         ))}
         <div className="space-y-1.5">
-          <Label>Total</Label>
+          <Label>Total (everyone)</Label>
           <div className="flex h-11 items-center rounded-md border bg-muted px-3 text-lg font-semibold tabular-nums" aria-live="polite">{total}</div>
         </div>
       </div>
       {filled && byGender !== total && (
-        <Alert><TriangleAlert className="size-4" /><AlertDescription>Male + Female + Children = {byGender}, but Total is {total}. You can still save.</AlertDescription></Alert>
+        <Alert><TriangleAlert className="size-4" /><AlertDescription>Male + Female + Children + Guests = {byGender}, but Total is {total}. You can still save.</AlertDescription></Alert>
       )}
-      <p className="text-xs text-muted-foreground">{registered} people are marked present on this Sunday (children and unregistered visitors are counted only here).</p>
+      <p className="text-xs text-muted-foreground">
+        {registered} marked present in the register + {n("children")} children + {n("guests")} guests &amp; pastors = <span className="font-semibold text-foreground">{total}</span>. This total is shown everywhere as present.
+      </p>
       <div className="space-y-1.5">
         <Label htmlFor="hc-notes">Notes (one per line — streaks, returnees, converts)</Label>
         <Textarea id="hc-notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />

@@ -1,6 +1,6 @@
 import { Download } from "lucide-react"
 import { Prisma } from "@prisma/client"
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { blobConfigured } from "@/lib/blob"
 import { getSettings } from "@/lib/settings"
@@ -16,7 +16,7 @@ import { PendingAttendanceReviews } from "./pending-reviews"
 export const metadata = { title: "Uploads & import" }
 
 export default async function UploadsPage() {
-  await requireAdmin()
+  await requirePermission("imports.manage")
   const [uploads, settings] = await Promise.all([
     prisma.upload.findMany({ orderBy: { uploadedAt: "desc" }, take: 200 }),
     getSettings(),

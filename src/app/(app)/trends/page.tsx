@@ -1,5 +1,5 @@
 import { Activity, CalendarCheck, Repeat, TriangleAlert, UserMinus } from "lucide-react"
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import {
   activityOf, cohorts, memberStats, monthlyAverages, presentByService, referenceService, servicePoints, teamRates, visitsInRange,
@@ -33,7 +33,7 @@ function rangeDates(range: string, refIso: string, from?: string, to?: string): 
 type SP = { range?: string; from?: string; to?: string; status?: string; team?: string; gender?: string }
 
 export default async function TrendsPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireAdmin()
+  await requirePermission("dashboard.view")
   const sp = await searchParams
   const ref = await referenceService()
   if (!ref) return <EmptyState title="No attendance yet" />
@@ -54,9 +54,11 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
     visitsInRange(from, to, filters),
   ])
   const totals = new Map(points.map((p) => [p.date, p.headcount?.total ?? null]))
-  const sundays = present.filter((p) => p.date >= from && p.date <= to).map((p) => ({ ...p, total: filtered ? null : totals.get(p.date) ?? null }))
+  // Unfiltered, present comes from servicePoints (= weekly headcount total when there is one).
+  const presentOf = (p: { date: string; present: number }) => filtered ? present.find((x) => x.date === p.date)?.present ?? 0 : p.present
+  const sundays = (filtered ? present : points.filter((p) => p.recordTaken)).filter((p) => p.date >= from && p.date <= to).map((p) => ({ date: p.date, present: p.present, total: filtered ? null : totals.get(p.date) ?? null }))
   const months = monthlyAverages(
-    points.filter((p) => p.date >= from && p.date <= to).map((p) => ({ ...p, present: present.find((x) => x.date === p.date)?.present ?? 0, headcount: filtered ? null : p.headcount })),
+    points.filter((p) => p.date >= from && p.date <= to).map((p) => ({ ...p, present: presentOf(p), headcount: filtered ? null : p.headcount })),
   )
   const hc = points.filter((p) => p.headcount && p.date >= from && p.date <= to).map((p) => ({ date: p.date, ...p.headcount! }))
   const cohortInRange = cohortRows.filter((c) => `${c.month}-01` >= from.slice(0, 7) + "-01" && `${c.month}-01` <= to)

@@ -1,10 +1,10 @@
-import { requireAdminApi } from "@/lib/auth"
+import { requirePermissionApi } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { audit } from "@/lib/audit"
 
 /** Download the original uploaded file (proxied so the link only works when signed in). */
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdminApi()
+  const admin = await requirePermissionApi("imports.manage")
   if (admin instanceof Response) return admin
   const up = await prisma.upload.findUnique({ where: { id: Number((await params).id) } })
   if (!up?.blobUrl) return Response.json({ error: "Original file not stored" }, { status: 404 })

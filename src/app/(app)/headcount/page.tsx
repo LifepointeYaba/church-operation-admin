@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { NavLink } from "@/components/navigation"
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { formatDate, isoDate, lastSunday } from "@/lib/dates"
 import { registerBreakdown } from "@/lib/metrics/breakdown"
@@ -18,11 +18,11 @@ export const metadata = { title: "Weekly headcount" }
 
 type SP = { date?: string; year?: string; month?: string; source?: string; calc?: string }
 
-const NUM_FIELDS = ["workers", "members", "firstTimers", "secondTimers", "total", "male", "female", "children"] as const
+const NUM_FIELDS = ["workers", "members", "firstTimers", "secondTimers", "male", "female", "children", "guests", "total"] as const
 type NumField = (typeof NUM_FIELDS)[number]
 const NUM_LABELS: Record<NumField, string> = {
   workers: "Workers", members: "Members", firstTimers: "1st", secondTimers: "2nd",
-  total: "Total", male: "Male", female: "Female", children: "Children",
+  total: "Total", male: "Male", female: "Female", children: "Children", guests: "Guests",
 }
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 const SOURCE_LABEL: Record<HeadcountSource, string> = { upload: "From attendance", manual: "Entered by hand", chart: "Chart sheet" }
@@ -34,7 +34,7 @@ function sourceOf(h: { uploadId: number | null; fromRegister: boolean; upload: {
 }
 
 export default async function HeadcountPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireAdmin()
+  await requirePermission("headcount.manage")
   const sp = await searchParams
   const services = await prisma.service.findMany({
     orderBy: { date: "desc" },
@@ -90,19 +90,19 @@ export default async function HeadcountPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="stagger space-y-4">
-      <PageHeader title="Weekly headcount" description="Filled automatically from each attendance upload. Add children by hand and adjust any number if needed. Changing a Sunday keeps the old version." />
+      <PageHeader title="Weekly headcount" description="Filled automatically from each attendance upload. Add children and guests/pastors by hand; the total (everyone) is what the dashboard and trends show. Changing a Sunday keeps the old version." />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,420px)_1fr]">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Sunday headcount</CardTitle>
-            <CardDescription>Total = Workers + Members + First + Second timers. We warn if Male + Female + Children doesn&apos;t match.</CardDescription>
+            <CardDescription>Total = Workers + Members + First + Second timers + Children + Guests &amp; pastors.</CardDescription>
           </CardHeader>
           <CardContent>
             <HeadcountForm
               key={`${chosen}-${cur?.id ?? "new"}-${cur?.version ?? 0}`}
               date={chosen}
               dates={recent}
-              existing={cur ? { workers: cur.workers, members: cur.members, firstTimers: cur.firstTimers, secondTimers: cur.secondTimers, male: cur.male, female: cur.female, children: cur.children, total: cur.total } : null}
+              existing={cur ? { workers: cur.workers, members: cur.members, firstTimers: cur.firstTimers, secondTimers: cur.secondTimers, male: cur.male, female: cur.female, children: cur.children, guests: cur.guests, total: cur.total } : null}
               registered={current?._count.attendance ?? 0}
               register={register}
               source={cur ? sourceOf(cur) : null}
@@ -199,7 +199,7 @@ export default async function HeadcountPage({ searchParams }: { searchParams: Pr
                 </TableHeader>
                 <TableBody>
                   {filteredRows.map(({ service: s, date, h, source: src }) => {
-                    const mismatch = h.male + h.female + h.children !== h.total
+                    const mismatch = h.male + h.female + h.children + h.guests !== h.total
                     return (
                       <TableRow key={s.id} className={cn(date === chosen && "bg-muted/50")}>
                         <TableCell className="pl-6 whitespace-nowrap">

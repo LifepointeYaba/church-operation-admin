@@ -1,4 +1,4 @@
-import { requireAdminApi } from "@/lib/auth"
+import { requirePermissionApi } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { audit } from "@/lib/audit"
 import { toCsv } from "@/lib/csv-export"
@@ -7,7 +7,7 @@ import { getSettings } from "@/lib/settings"
 import { isoDate } from "@/lib/dates"
 
 export async function GET(req: Request) {
-  const admin = await requireAdminApi()
+  const admin = await requirePermissionApi("members.export")
   if (admin instanceof Response) return admin
   const ids = new URL(req.url).searchParams.get("ids")?.split(",").filter(Boolean).map(Number)
   const ref = await referenceService()

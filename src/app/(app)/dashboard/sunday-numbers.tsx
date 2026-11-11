@@ -74,7 +74,7 @@ export function SundayNumbers({ month, columns, selected, source, prevHref, next
             ))}
             {source === "headcount" && (
               <tr className="border-t text-muted-foreground">
-                <th scope="row" className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left font-normal whitespace-nowrap">Marked present in register</th>
+                <th scope="row" className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left font-normal whitespace-nowrap">Present</th>
                 {columns.map((c) => (
                   <td key={c.date} className={cn("px-4 py-2.5 text-right", c.date === selected && "bg-primary-soft/50")}>{c.present ?? "—"}</td>
                 ))}

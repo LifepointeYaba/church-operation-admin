@@ -12,12 +12,15 @@ const sha = (s: string) => createHash("sha256").update(s).digest("hex")
 
 export async function requestReset(_: ResetState, form: FormData): Promise<ResetState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase()
-  const generic = { message: "If that email belongs to the Super Admin, a reset link has been sent. It is valid for 1 hour." }
+  const generic = { message: "If that email has an account, a reset link has been sent. It is valid for 1 hour." }
   if (!emailConfigured()) {
-    return { error: "Email is not set up yet. Reset the password with the setup command: npm run setup-admin -- --reset" }
+    return { error: "Email reset isn’t set up yet. Ask an admin to generate a new password for you from Users & roles." }
   }
   const user = await prisma.user.findUnique({ where: { email } })
-  if (!user) return generic
+  if (!user) {
+    await audit("password_reset_requested", "user", null, null, { email, reason: "unknown email" }, undefined, null)
+    return generic
+  }
   const token = randomBytes(32).toString("base64url")
   await prisma.passwordResetToken.create({
     data: { userId: user.id, tokenHash: sha(token), expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
@@ -29,7 +32,7 @@ export async function requestReset(_: ResetState, form: FormData): Promise<Reset
     "Reset your LifePointe Admin password",
     `<p>Someone asked to reset the LifePointe Admin password.</p><p><a href="${link}">Choose a new password</a> (valid for 1 hour).</p><p>If this wasn't you, ignore this email.</p>`,
   )
-  await audit("password_reset_requested", "user", user.id)
+  await audit("password_reset_requested", "user", user.id, null, null, undefined, { id: user.id, email: user.email })
   return generic
 }
 
@@ -45,10 +48,14 @@ export async function completeReset(_: ResetState, form: FormData): Promise<Rese
   await prisma.$transaction([
     prisma.user.update({
       where: { id: row.userId },
-      data: { passwordHash: await hashPassword(password), passwordChangedAt: new Date(), failedAttempts: 0, lockedUntil: null },
+      data: {
+        passwordHash: await hashPassword(password), passwordChangedAt: new Date(), failedAttempts: 0, lockedUntil: null,
+        mustChangePassword: false, tempPasswordExpiresAt: null,
+      },
     }),
     prisma.passwordResetToken.update({ where: { id: row.id }, data: { usedAt: new Date() } }),
   ])
-  await audit("password_reset", "user", row.userId)
+  const owner = await prisma.user.findUnique({ where: { id: row.userId }, select: { id: true, email: true } })
+  await audit("password_reset", "user", row.userId, null, { via: "email link" }, undefined, owner)
   return { done: true, message: "Password updated. You can sign in now." }
 }

@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth"
+import { can, requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { activityOf, memberStats, referenceService } from "@/lib/metrics"
 import { getSettings } from "@/lib/settings"
@@ -11,7 +11,7 @@ import { AddMemberButton } from "./member-form"
 export const metadata = { title: "Members" }
 
 export default async function MembersPage({ searchParams }: { searchParams: Promise<{ q?: string; tab?: string }> }) {
-  await requireAdmin()
+  const user = await requirePermission("members.view")
   await purgeExpiredDeletes()
   const { q, tab } = await searchParams
   const [ref, settings, teams, extra, deleted] = await Promise.all([
@@ -19,7 +19,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
     getSettings(),
     prisma.team.findMany({ orderBy: { name: "asc" } }),
     prisma.member.findMany({ where: { deletedAt: null }, select: { id: true, email: true, flags: true } }),
-    prisma.member.findMany({
+    !can(user, "members.delete") ? [] : prisma.member.findMany({
       where: { deletedAt: { not: null } },
       select: { id: true, firstName: true, lastName: true, phone: true, status: true, deletedAt: true },
       orderBy: { deletedAt: "desc" },

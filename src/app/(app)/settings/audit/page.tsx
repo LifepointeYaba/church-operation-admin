@@ -1,6 +1,6 @@
 import Link from "next/link"
 import type { Prisma } from "@prisma/client"
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -13,24 +13,27 @@ export const metadata = { title: "Audit log" }
 
 const PAGE = 100
 
-export default async function AuditPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string; action?: string; entity?: string; record?: string; page?: string }> }) {
-  await requireAdmin()
+export default async function AuditPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string; action?: string; entity?: string; record?: string; actor?: string; page?: string }> }) {
+  await requirePermission("audit.view")
   const sp = await searchParams
   const page = Math.max(1, Number(sp.page) || 1)
   const where: Prisma.AuditLogWhereInput = {
     ...(sp.action ? { action: sp.action } : {}),
     ...(sp.entity ? { entity: sp.entity } : {}),
     ...(sp.record ? { entityId: sp.record } : {}),
+    ...(sp.actor ? { actorEmail: sp.actor === "__system" ? null : sp.actor } : {}),
     ...(sp.from || sp.to ? { at: { ...(sp.from ? { gte: new Date(`${sp.from}T00:00:00+01:00`) } : {}), ...(sp.to ? { lte: new Date(`${sp.to}T23:59:59+01:00`) } : {}) } } : {}),
   }
   // Keep 2 years of history.
   await prisma.auditLog.deleteMany({ where: { at: { lt: new Date(Date.now() - 730 * 86400000) } } })
-  const [rows, total, actions, entities] = await Promise.all([
+  const [rows, total, actions, entities, actors] = await Promise.all([
     prisma.auditLog.findMany({ where, orderBy: { at: "desc" }, skip: (page - 1) * PAGE, take: PAGE }),
     prisma.auditLog.count({ where }),
     prisma.auditLog.findMany({ distinct: ["action"], select: { action: true }, orderBy: { action: "asc" } }),
     prisma.auditLog.findMany({ distinct: ["entity"], select: { entity: true }, orderBy: { entity: "asc" } }),
+    prisma.auditLog.findMany({ distinct: ["actorEmail"], where: { actorEmail: { not: null } }, select: { actorEmail: true }, orderBy: { actorEmail: "asc" } }),
   ])
+  const names = new Map((await prisma.user.findMany({ select: { email: true, name: true } })).map((u) => [u.email, u.name]))
   const qs = (p: number) => new URLSearchParams({ ...Object.fromEntries(Object.entries(sp).filter(([, v]) => v)), page: String(p) }).toString()
   return (
     <div className="stagger space-y-4">
@@ -46,6 +49,11 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <option value="">All records</option>
           {entities.map((e) => <option key={e.entity}>{e.entity}</option>)}
         </SelectField>
+        <SelectField name="actor" defaultValue={sp.actor ?? ""} aria-label="By">
+          <option value="">Anyone</option>
+          <option value="__system">System / signed out</option>
+          {actors.map((a) => <option key={a.actorEmail} value={a.actorEmail!}>{names.get(a.actorEmail!) || a.actorEmail}</option>)}
+        </SelectField>
         <Input name="record" defaultValue={sp.record} placeholder="Record ID" className="h-9 w-28" aria-label="Record ID" />
         <Button variant="secondary">Filter</Button>
         <Button variant="ghost" asChild><Link href="/settings/audit">Clear</Link></Button>
@@ -53,14 +61,21 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       <Card className="py-0">
         <CardContent className="overflow-x-auto px-0">
           <Table>
-            <TableHeader><TableRow><TableHead className="pl-4">When</TableHead><TableHead>Action</TableHead><TableHead>Record</TableHead><TableHead>Change</TableHead><TableHead className="pr-4">IP</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead className="pl-4">When</TableHead><TableHead>By</TableHead><TableHead>Action</TableHead><TableHead>Record</TableHead><TableHead>Change</TableHead><TableHead className="pr-4">IP</TableHead></TableRow></TableHeader>
             <TableBody>
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="pl-4 whitespace-nowrap">{r.at.toLocaleString("en-GB", { timeZone: "Africa/Lagos", dateStyle: "medium", timeStyle: "short" })}</TableCell>
+                  <TableCell className="max-w-48">
+                    {r.actorEmail ? (
+                      <Link className="block truncate hover:underline" href={`?actor=${encodeURIComponent(r.actorEmail)}`} title={r.actorEmail}>{names.get(r.actorEmail) || r.actorEmail}</Link>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell>{r.action}</TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {r.entity === "member" && r.entityId ? <Link className="hover:underline" href={`/members/${r.entityId}`}>member #{r.entityId}</Link> : `${r.entity}${r.entityId ? ` ${r.entityId}` : ""}`}
+                    {r.entity === "member" && r.entityId ? <Link className="hover:underline" href={`/members/${r.entityId}`}>member #{r.entityId}</Link>
+                      : r.entity === "user" && r.entityId ? <Link className="hover:underline" href={`?entity=user&record=${r.entityId}`}>user {r.entityId.slice(-6)}</Link>
+                      : `${r.entity}${r.entityId ? ` ${r.entityId}` : ""}`}
                   </TableCell>
                   <TableCell className="max-w-md">
                     {(r.before || r.after) && (

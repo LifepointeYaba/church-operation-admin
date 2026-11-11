@@ -1,8 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { useTheme } from "next-themes"
 import { Check, Pencil, Trash2 } from "lucide-react"
 import { useRunAction } from "@/hooks/use-action-mutation"
 import { useConfirm } from "@/components/confirm-dialog"
@@ -11,9 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { AppSettings } from "@/lib/settings"
-import { saveThemePref } from "../actions"
 import {
-  addTeamAction, changePasswordAction, deleteTeamAction, renameTeamAction, saveStatusesAction, saveThresholdsAction,
+  addTeamAction, deleteTeamAction, renameTeamAction, saveStatusesAction, saveThresholdsAction,
 } from "./actions"
 
 /** Save/delete helper: React Query mutation with loading state and success/failure alerts. */
@@ -91,35 +88,6 @@ export function TeamsManager({ teams }: { teams: { id: number; name: string; cou
           </li>
         ))}
       </ul>
-    </div>
-  )
-}
-
-export function PasswordForm() {
-  const router = useRouter()
-  const { pending, act } = useAct()
-  return (
-    <form className="space-y-3" onSubmit={(e) => {
-      e.preventDefault()
-      const fd = new FormData(e.currentTarget)
-      act(() => changePasswordAction(String(fd.get("current")), String(fd.get("next")), String(fd.get("confirm"))), "Password changed — please sign in again", () => router.push("/login"))
-    }}>
-      <div className="space-y-1.5"><Label htmlFor="current">Current password</Label><Input id="current" name="current" type="password" autoComplete="current-password" required /></div>
-      <div className="space-y-1.5"><Label htmlFor="next">New password</Label><Input id="next" name="next" type="password" minLength={10} autoComplete="new-password" required /></div>
-      <div className="space-y-1.5"><Label htmlFor="confirm">Confirm new password</Label><Input id="confirm" name="confirm" type="password" minLength={10} autoComplete="new-password" required /></div>
-      <Button loading={pending}>Change password</Button>
-    </form>
-  )
-}
-
-export function ThemeChoice() {
-  const { theme, setTheme } = useTheme()
-  return (
-    <div role="radiogroup" aria-label="Theme" className="flex gap-2">
-      {(["light", "dark", "system"] as const).map((t) => (
-        <Button key={t} role="radio" aria-checked={theme === t} variant={theme === t ? "default" : "outline"} className="capitalize"
-          onClick={() => { setTheme(t); void saveThemePref(t) }}>{t}</Button>
-      ))}
     </div>
   )
 }

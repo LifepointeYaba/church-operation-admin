@@ -1,6 +1,6 @@
 "use server"
 
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { audit } from "@/lib/audit"
 import { refreshData } from "@/lib/revalidate"
@@ -8,7 +8,7 @@ import { checkServiceDate, fromIso, isoDate } from "@/lib/dates"
 import { syncHeadcountsForMark } from "@/lib/headcount-sync"
 
 export async function ensureServiceAction(dateIso: string) {
-  await requireAdmin()
+  await requirePermission("attendance.mark")
   const d = fromIso(dateIso)
   if (!d) return { ok: false as const, error: "Invalid date" }
   const c = checkServiceDate(d)
@@ -18,7 +18,7 @@ export async function ensureServiceAction(dateIso: string) {
 }
 
 export async function toggleAttendanceAction(serviceId: number, memberId: number, present: boolean) {
-  await requireAdmin()
+  await requirePermission("attendance.mark")
   const svc = await prisma.service.findUniqueOrThrow({ where: { id: serviceId } })
   // Update the register and the weekly headcount (worker/member/first/second timer, male/female, total)
   // together: if the headcount can't be updated, the mark is not saved either, so the two never drift apart.
@@ -48,7 +48,7 @@ export async function toggleAttendanceAction(serviceId: number, memberId: number
 }
 
 export async function setRecordTakenAction(serviceId: number, recordTaken: boolean) {
-  await requireAdmin()
+  await requirePermission("attendance.mark")
   const s = await prisma.service.update({ where: { id: serviceId }, data: { recordTaken } })
   await audit("service_update", "service", serviceId, null, { date: isoDate(s.date), recordTaken })
   refreshData()

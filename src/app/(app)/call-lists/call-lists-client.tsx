@@ -14,6 +14,7 @@ import { EmptyState, StatusBadge } from "@/components/common"
 import { displayPhone } from "@/lib/phone"
 import { formatDate } from "@/lib/dates"
 import { FollowUpForm } from "../members/[id]/profile-client"
+import { useCan } from "@/components/permissions"
 import { decideSuggestionAction } from "./actions"
 
 type Person = { id: number; name: string; phone: string | null; status: string; teams: string[]; personResponsible: string | null; lastDate: string | null }
@@ -73,6 +74,7 @@ export function SuggestionReview({ items, statuses }: { items: Suggestion[]; sta
     (v: { s: Suggestion; approve: boolean }) => decideSuggestionAction(v.s.id, v.approve, choice[v.s.id] ?? v.s.to),
     { success: (_r, v) => v.approve ? `${v.s.name}: status changed to ${choice[v.s.id] ?? v.s.to}` : `Suggestion for ${v.s.name} dismissed` },
   )
+  const canDecide = useCan()("callLists.manage")
   if (!items.length) return <EmptyState title="No suggestions waiting" />
   const pending = m.isPending
   const busy = (s: Suggestion, approve: boolean) => m.isPending && m.variables?.s.id === s.id && m.variables.approve === approve
@@ -87,14 +89,18 @@ export function SuggestionReview({ items, statuses }: { items: Suggestion[]; sta
               <TableCell><Link href={`/members/${s.memberId}`} className="font-medium hover:underline">{s.name}</Link><div className="text-xs text-muted-foreground">{displayPhone(s.phone)}</div></TableCell>
               <TableCell><StatusBadge status={s.from} /></TableCell>
               <TableCell>
-                <SelectField aria-label="New status" value={choice[s.id] ?? s.to} onChange={(e) => setChoice({ ...choice, [s.id]: e.target.value })}>
-                  {statuses.map((st) => <option key={st}>{st}</option>)}
-                </SelectField>
+                {canDecide ? (
+                  <SelectField aria-label="New status" value={choice[s.id] ?? s.to} onChange={(e) => setChoice({ ...choice, [s.id]: e.target.value })}>
+                    {statuses.map((st) => <option key={st}>{st}</option>)}
+                  </SelectField>
+                ) : <StatusBadge status={s.to} />}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">{s.reason}</TableCell>
               <TableCell className="whitespace-nowrap text-right">
+                {canDecide && <>
                 <Button size="sm" loading={busy(s, true)} disabled={pending} onClick={() => decide(s, true)}>{!busy(s, true) && <Check className="size-4" />} Approve</Button>{" "}
                 <Button size="sm" variant="ghost" loading={busy(s, false)} disabled={pending} onClick={() => decide(s, false)}>{!busy(s, false) && <X className="size-4" />} Dismiss</Button>
+                </>}
               </TableCell>
             </TableRow>
           ))}

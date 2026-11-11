@@ -9,6 +9,7 @@ import {
 import { ArrowUpDown, ChevronLeft, ChevronRight, Columns3, Download, RotateCcw } from "lucide-react"
 import { useActionMutation } from "@/hooks/use-action-mutation"
 import { useConfirm } from "@/components/confirm-dialog"
+import { useCan } from "@/components/permissions"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -47,7 +48,10 @@ const ACTIVITIES = [["active", "Active"], ["at_risk", "At risk"], ["inactive", "
 export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, deleted }: {
   rows: MemberRow[]; initialQuery: string; initialTab: string; statuses: string[]; teams: string[]; deleted: Deleted[]
 }) {
-  const [tab, setTab] = useState(initialTab)
+  const can = useCan()
+  const canEdit = can("members.edit")
+  const canDelete = can("members.delete")
+  const [tab, setTab] = useState(canDelete || initialTab !== "deleted" ? initialTab : "all")
   const [q, setQ] = useState(initialQuery)
   const [f, setF] = useState({ status: "", team: "", gender: "", activity: "", responsible: "" })
   const [sorting, setSorting] = useState<SortingState>([])
@@ -85,7 +89,7 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
     }
 
   const columns = useMemo<ColumnDef<MemberRow>[]>(() => [
-    {
+    ...(!canEdit ? [] : [{
       id: "select",
       header: ({ table }) => (
         <Checkbox
@@ -97,7 +101,7 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
       cell: ({ row }) => <Checkbox aria-label={`Select ${row.original.name}`} checked={row.getIsSelected()} onCheckedChange={(v) => row.toggleSelected(!!v)} />,
       enableSorting: false,
       enableHiding: false,
-    },
+    } satisfies ColumnDef<MemberRow>]),
     {
       accessorKey: "name",
       header: sortHeader("Name"),
@@ -123,7 +127,7 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
     { accessorKey: "lastDate", header: sortHeader("Last attended"), cell: ({ getValue }) => (getValue() ? <span className="whitespace-nowrap">{formatDate(getValue() as string)}</span> : "—"), sortUndefined: "last" },
     { accessorKey: "visits", header: sortHeader("Visits") },
     { accessorKey: "streak", header: sortHeader("Streak") },
-  ], [tab])
+  ], [tab, canEdit])
 
   const table = useReactTable({
     data,
@@ -159,7 +163,7 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
   if (tab === "deleted") {
     return (
       <div className="space-y-4">
-        <TabBar tab={tab} setTab={setTab} fixCount={rows.filter((r) => r.flags.some((fl) => fl !== "shared_phone")).length} deletedCount={deleted.length} />
+        <TabBar tab={tab} setTab={setTab} fixCount={rows.filter((r) => r.flags.some((fl) => fl !== "shared_phone")).length} deletedCount={canDelete ? deleted.length : null} />
         {deleted.length === 0 ? (
           <EmptyState title="Nothing deleted">Deleted records stay here for 30 days and can be restored.</EmptyState>
         ) : (
@@ -190,7 +194,7 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
 
   return (
     <div className="space-y-3">
-      <TabBar tab={tab} setTab={setTab} fixCount={rows.filter((r) => r.flags.some((fl) => fl !== "shared_phone")).length} deletedCount={deleted.length} />
+      <TabBar tab={tab} setTab={setTab} fixCount={rows.filter((r) => r.flags.some((fl) => fl !== "shared_phone")).length} deletedCount={canDelete ? deleted.length : null} />
       <div className="flex flex-wrap items-center gap-2">
         <Input value={q} onChange={(e) => { setQ(e.target.value); table.setPageIndex(0) }} placeholder="Search name or phone…" className="w-full sm:w-64" aria-label="Search" />
         <SelectField aria-label="Status" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
@@ -225,11 +229,11 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="sm" asChild><a href={exportHref}><Download className="size-4" /> Export CSV</a></Button>
+          {can("members.export") && <Button variant="outline" size="sm" asChild><a href={exportHref}><Download className="size-4" /> Export CSV</a></Button>}
         </div>
       </div>
 
-      {selectedIds.length > 0 && (
+      {canEdit && selectedIds.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 p-2 text-sm">
           <span className="font-medium">{selectedIds.length} selected</span>
           <SelectField aria-label="Set status" disabled={pending} defaultValue="" resetOnChange onChange={(e) => e.target.value && bulk({ status: e.target.value })}>
@@ -287,13 +291,13 @@ export function MembersTable({ rows, initialQuery, initialTab, statuses, teams, 
   )
 }
 
-function TabBar({ tab, setTab, fixCount, deletedCount }: { tab: string; setTab: (t: string) => void; fixCount: number; deletedCount: number }) {
+function TabBar({ tab, setTab, fixCount, deletedCount }: { tab: string; setTab: (t: string) => void; fixCount: number; deletedCount: number | null }) {
   return (
     <Tabs value={tab} onValueChange={setTab}>
       <TabsList>
         <TabsTrigger value="all">All</TabsTrigger>
         <TabsTrigger value="fix">Fix details <Badge variant="secondary" className="ml-1">{fixCount}</Badge></TabsTrigger>
-        <TabsTrigger value="deleted">Deleted <Badge variant="secondary" className="ml-1">{deletedCount}</Badge></TabsTrigger>
+        {deletedCount !== null && <TabsTrigger value="deleted">Deleted <Badge variant="secondary" className="ml-1">{deletedCount}</Badge></TabsTrigger>}
       </TabsList>
     </Tabs>
   )

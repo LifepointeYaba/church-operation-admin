@@ -31,8 +31,8 @@ export async function GET(req: Request) {
     const attCsv = toCsv(["member_id", "date"], att.map((a) => [a.member_id, isoDate(a.date)]))
     const heads = await prisma.serviceHeadcount.findMany({ where: { isCurrent: true }, include: { service: true }, orderBy: { service: { date: "asc" } } })
     const headCsv = toCsv(
-      ["date", "workers", "members", "first_timers", "second_timers", "male", "female", "children", "total"],
-      heads.map((h) => [isoDate(h.service.date), h.workers, h.members, h.firstTimers, h.secondTimers, h.male, h.female, h.children, h.total]),
+      ["date", "workers", "members", "first_timers", "second_timers", "male", "female", "children", "guests", "total"],
+      heads.map((h) => [isoDate(h.service.date), h.workers, h.members, h.firstTimers, h.secondTimers, h.male, h.female, h.children, h.guests, h.total]),
     )
     const stamp = new Date().toISOString().slice(0, 10)
     files = (await Promise.all([

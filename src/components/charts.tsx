@@ -79,7 +79,7 @@ export function AttendanceChart({ sundays, months, defaultFrom = "2025-01-01", a
   )
 }
 
-export type HeadcountPoint = { date: string; workers: number; members: number; firstTimers: number; secondTimers: number; male: number; female: number; children: number | null }
+export type HeadcountPoint = { date: string; workers: number; members: number; firstTimers: number; secondTimers: number; male: number; female: number; children: number | null; guests: number | null }
 
 const roleConfig = {
   workers: { label: "Workers", color: "var(--chart-1)" },
@@ -91,13 +91,16 @@ const genderConfig = {
   male: { label: "Male", color: "var(--chart-1)" },
   female: { label: "Female", color: "var(--chart-2)" },
   children: { label: "Children", color: "var(--chart-3)" },
+  guests: { label: "Guests & pastors", color: "var(--chart-4)" },
 } satisfies ChartConfig
 
 export function HeadcountChart({ points, maxBarSize = 28 }: { points: HeadcountPoint[]; maxBarSize?: number }) {
   const [split, setSplit] = useState<"role" | "gender">("role")
-  // The register has no ages, so drop Children when it's unknown everywhere.
+  // The register has no ages or guests, so drop Children / Guests when unknown everywhere.
   const noChildren = points.every((p) => p.children == null)
-  const config = split === "role" ? roleConfig : noChildren ? { male: genderConfig.male, female: genderConfig.female } : genderConfig
+  const noGuests = points.every((p) => !p.guests)
+  const config = split === "role" ? roleConfig : Object.fromEntries(Object.entries(genderConfig)
+    .filter(([k]) => !(k === "children" && noChildren) && !(k === "guests" && noGuests))) as Partial<typeof genderConfig>
   const keys = Object.keys(config) as (keyof HeadcountPoint)[]
   const data = points.map((p) => ({ ...p, label: formatDate(p.date) }))
   return (

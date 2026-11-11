@@ -1,6 +1,6 @@
 "use server"
 
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { audit } from "@/lib/audit"
 import { refreshData } from "@/lib/revalidate"
@@ -68,7 +68,7 @@ function hashFile(buf: Buffer) {
 }
 
 export async function previewAttendanceImport(form: FormData) {
-  await requireAdmin()
+  await requirePermission("imports.manage")
   try {
     const { buf, parsed } = await read(form)
     const duplicate = await findDuplicateUpload(hashFile(buf), parsed)
@@ -103,7 +103,7 @@ export async function previewAttendanceImport(form: FormData) {
 }
 
 export async function commitAttendanceImport(form: FormData, createUnmatchedNoPhone: boolean, allowDuplicate = false) {
-  await requireAdmin()
+  await requirePermission("imports.manage")
   let uploadId: number | null = null
   try {
     const { file, buf, parsed } = await read(form)
@@ -199,7 +199,7 @@ function pendingPerson(value: Prisma.JsonValue | undefined, row: number): Parsed
 }
 
 export async function searchPendingAttendanceMembers(uploadId: number, row: number, query: string) {
-  await requireAdmin()
+  await requirePermission("imports.manage")
   try {
     if (!Number.isSafeInteger(uploadId) || uploadId < 1 || !Number.isSafeInteger(row) || row < 2) {
       throw new Error("Invalid upload or row")
@@ -261,7 +261,7 @@ export async function resolvePendingAttendanceImport(
   status = "Member",
   selectedMemberId?: number,
 ) {
-  await requireAdmin()
+  await requirePermission("imports.manage")
   try {
     if (!Number.isSafeInteger(uploadId) || uploadId < 1 || !Number.isSafeInteger(row) || row < 2) {
       throw new Error("Invalid upload or row")

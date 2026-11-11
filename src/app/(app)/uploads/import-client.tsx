@@ -182,7 +182,7 @@ export function AttendanceImport() {
           <AlertDescription>
             <p>Added {done.membersAdded} people, updated {done.membersUpdated}, moved {done.membersPromoted} up a stage (First Timer → Second Timer → Regular), added {done.servicesAdded} Sundays and {done.attendanceAdded} present marks. {done.rejected.length} rejected.</p>
             {done.headcount.created.length + done.headcount.refreshed.length > 0 && (
-              <p className="mt-1">Weekly headcount filled from this upload for {[...done.headcount.created, ...done.headcount.refreshed].map(formatDate).join(", ")}. Add children on <a className="underline" href={`/headcount?date=${done.headcount.created.at(-1) ?? done.headcount.refreshed.at(-1)}`}>Weekly headcount</a>.</p>
+              <p className="mt-1">Weekly headcount filled from this upload for {[...done.headcount.created, ...done.headcount.refreshed].map(formatDate).join(", ")}. Add children and guests/pastors on <a className="underline" href={`/headcount?date=${done.headcount.created.at(-1) ?? done.headcount.refreshed.at(-1)}`}>Weekly headcount</a>.</p>
             )}
             {done.headcount.kept.length > 0 && (
               <p className="mt-1">Headcount already entered by hand for {done.headcount.kept.map(formatDate).join(", ")}, so it was left as is. Use “Fill from register” there to update it.</p>

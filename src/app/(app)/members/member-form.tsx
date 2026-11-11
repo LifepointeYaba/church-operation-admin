@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { SelectField } from "@/components/select-field"
 import { displayPhone } from "@/lib/phone"
 import type { MemberInput } from "@/lib/members"
+import { useCan } from "@/components/permissions"
 import { checkDuplicatesAction, createMemberAction, mergeAction, updateMemberAction } from "./actions"
 
 type Dup = Awaited<ReturnType<typeof checkDuplicatesAction>>
@@ -74,6 +75,7 @@ export function MemberForm({
     refresh: false,
   })
   const merge = (otherId: number) => memberId && mergeMutation.mutate(otherId)
+  const canMerge = useCan()("members.delete") && !!memberId
 
   return (
     <form onSubmit={submit} className="space-y-4">
@@ -114,7 +116,7 @@ export function MemberForm({
               <Link className="underline" href={`/members/${dup.exact.id}`}>{dup.exact.firstName} {dup.exact.lastName}</Link>{" "}
               ({displayPhone(dup.exact.phone)})
             </span>
-            {memberId && <Button type="button" size="sm" variant="outline" className="mt-2" loading={mergeMutation.isPending} onClick={() => merge(dup.exact!.id)}>Merge into that record</Button>}
+            {canMerge && <Button type="button" size="sm" variant="outline" className="mt-2" loading={mergeMutation.isPending} onClick={() => merge(dup.exact!.id)}>Merge into that record</Button>}
           </AlertDescription>
         </Alert>
       )}
@@ -137,7 +139,7 @@ export function MemberForm({
         <Alert variant="destructive">
           <AlertDescription>
             {error.msg}
-            {error.clashId && memberId && (
+            {error.clashId && canMerge && (
               <Button type="button" size="sm" variant="outline" className="mt-2" loading={mergeMutation.isPending} onClick={() => merge(error.clashId!)}>Merge into #{error.clashId}</Button>
             )}
           </AlertDescription>
@@ -162,6 +164,7 @@ function Field({ label, children, required, wide }: { label: string; children: R
 export function AddMemberButton({ statuses }: { statuses: string[] }) {
   const [open, setOpen] = useState(false)
   const router = useRouter()
+  if (!useCan()("members.edit")) return null
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild><Button><Plus className="size-4" /> Add member</Button></DialogTrigger>

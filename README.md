@@ -1,6 +1,6 @@
 # church-operation-admin
 
-LifePointe Church admin dashboard (PRD v3): member register, Sunday attendance, weekly headcount, trends, call lists, settings and audit log. One Super Admin account.
+LifePointe Church admin dashboard (PRD v3): member register, Sunday attendance, weekly headcount, trends, call lists, settings, users & roles, and audit log. Accounts are created in-app (Users & roles) with role-based permissions; see `src/lib/permissions.ts`.
 
 Next.js 15 (App Router) · Postgres on Neon · Prisma 6 · Auth.js v5 · Tailwind v4 + shadcn/ui · Recharts.
 
@@ -39,7 +39,7 @@ npm run dev
 | `npm test` | Unit tests (phone, names, dates, importers) |
 | `npm run db:migrate` | `prisma migrate deploy` |
 | `npm run db:seed` | Import the CSVs in `data/` |
-| `npm run setup-admin` | Create or reset the Super Admin |
+| `npm run setup-admin` | Create the first Super Admin, or `--reset` any user's password |
 | `npm run db:studio` | Prisma Studio |
 
 ## Deploying (Vercel)

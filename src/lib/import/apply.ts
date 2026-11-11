@@ -224,7 +224,7 @@ export async function applyHeadcounts(
     const cur = currentBySvc.get(svc.id)
     const values = {
       workers: r.workers, members: r.members, firstTimers: r.firstTimers, secondTimers: r.secondTimers,
-      male: r.male, female: r.female, children: r.children, total: r.total,
+      male: r.male, female: r.female, children: r.children, guests: r.guests, total: r.total,
     }
     if (cur) {
       const same = Object.entries(values).every(([k, v]) => cur[k as keyof typeof values] === v)

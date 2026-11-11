@@ -1,14 +1,14 @@
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { getSettings } from "@/lib/settings"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/common"
-import { PasswordForm, StatusesForm, TeamsManager, ThemeChoice, ThresholdsForm } from "./settings-client"
+import { StatusesForm, TeamsManager, ThresholdsForm } from "./settings-client"
 
 export const metadata = { title: "Settings" }
 
 export default async function SettingsPage() {
-  await requireAdmin()
+  await requirePermission("settings.manage")
   const [settings, teams] = await Promise.all([
     getSettings(),
     prisma.team.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { members: true } } } }),
@@ -28,14 +28,6 @@ export default async function SettingsPage() {
         <Card className="lg:row-span-2">
           <CardHeader><CardTitle className="text-base">Teams</CardTitle><CardDescription>Rename a team to an existing name to merge them.</CardDescription></CardHeader>
           <CardContent><TeamsManager teams={teams.map((t) => ({ id: t.id, name: t.name, count: t._count.members }))} /></CardContent>
-        </Card>
-        <Card id="password" className="scroll-mt-20">
-          <CardHeader><CardTitle className="text-base">Change password</CardTitle><CardDescription>At least 10 characters. Other sessions are signed out.</CardDescription></CardHeader>
-          <CardContent><PasswordForm /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Theme</CardTitle></CardHeader>
-          <CardContent><ThemeChoice /></CardContent>
         </Card>
       </div>
     </div>

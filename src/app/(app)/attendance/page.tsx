@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { fromIso, isoDate, lastSunday } from "@/lib/dates"
 import { getSettings } from "@/lib/settings"
@@ -8,7 +8,7 @@ import { MarkAttendance } from "./mark-attendance"
 export const metadata = { title: "Mark attendance" }
 
 export default async function AttendancePage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
-  await requireAdmin()
+  await requirePermission("attendance.mark")
   const { date } = await searchParams
   const sunday = isoDate(lastSunday())
   const chosen = date && fromIso(date) ? date : sunday

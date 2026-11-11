@@ -1,6 +1,6 @@
 import { checkServiceDate, isoDate, parseSheetDate, todayLagos } from "../dates"
 
-export const HEADCOUNT_FIELDS = ["workers", "members", "firstTimers", "secondTimers", "male", "female", "children"] as const
+export const HEADCOUNT_FIELDS = ["workers", "members", "firstTimers", "secondTimers", "male", "female", "children", "guests"] as const
 export type HeadcountField = (typeof HEADCOUNT_FIELDS)[number]
 export type HeadcountValues = Record<HeadcountField, number> & { total: number }
 
@@ -30,12 +30,22 @@ const LABELS: Record<string, HeadcountField | "total"> = {
   male: "male",
   female: "female",
   children: "children",
+  guests: "guests",
+  guest: "guests",
+  pastors: "guests",
+  visitors: "guests",
 }
 
 const MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
 
-export function computeTotal(v: Pick<HeadcountValues, "workers" | "members" | "firstTimers" | "secondTimers">) {
+/** Register adults only: Workers + Members + First + Second timers. */
+export function registerTotal(v: Pick<HeadcountValues, "workers" | "members" | "firstTimers" | "secondTimers">) {
   return v.workers + v.members + v.firstTimers + v.secondTimers
+}
+
+/** Everyone on the day: the register numbers plus children and guests/pastors added by hand. */
+export function computeTotal(v: Pick<HeadcountValues, "workers" | "members" | "firstTimers" | "secondTimers"> & { children?: number; guests?: number }) {
+  return registerTotal(v) + (v.children ?? 0) + (v.guests ?? 0)
 }
 
 /** Validate a headcount: date must be a past Sunday, both totals must agree (warnings only). */
@@ -50,10 +60,11 @@ export function validateHeadcount(date: Date | null, v: HeadcountValues, today =
   for (const f of [...HEADCOUNT_FIELDS, "total"] as const) {
     if (!Number.isInteger(v[f]) || v[f] < 0) errors.push(`${f} must be a whole number ≥ 0`)
   }
+  // Older Chart sheets count children inside the role numbers, so either way of adding up is accepted.
   const byRole = computeTotal(v)
-  const byGender = v.male + v.female + v.children
-  if (byRole !== v.total) warnings.push(`Workers+Members+First+Second = ${byRole}, but Total is ${v.total}`)
-  if (byGender !== v.total) warnings.push(`Male+Female+Children = ${byGender}, but Total is ${v.total}`)
+  const byGender = v.male + v.female + v.children + v.guests
+  if (byRole !== v.total && registerTotal(v) + v.guests !== v.total) warnings.push(`Workers+Members+First+Second+Children+Guests = ${byRole}, but Total is ${v.total}`)
+  if (byGender !== v.total) warnings.push(`Male+Female+Children+Guests = ${byGender}, but Total is ${v.total}`)
   return { errors, warnings }
 }
 
@@ -87,9 +98,11 @@ function finishRow(dateRaw: string, vals: Partial<HeadcountValues>, today: Date,
     male: vals.male ?? NaN,
     female: vals.female ?? NaN,
     children: Number.isNaN(vals.children ?? NaN) ? 0 : (vals.children as number),
+    guests: Number.isNaN(vals.guests ?? NaN) ? 0 : (vals.guests as number),
     total: NaN,
   }
-  v.total = Number.isNaN(vals.total ?? NaN) ? computeTotal(v) : (vals.total as number)
+  // Headcount sheets count children inside the role numbers, so a missing Total is roles + guests.
+  v.total = Number.isNaN(vals.total ?? NaN) ? registerTotal(v) + v.guests : (vals.total as number)
   const { errors, warnings } = validateHeadcount(d, v, today)
   const date = d ? isoDate(d) : dateRaw
   if (d && seen.has(date)) errors.push("Duplicate date in file")

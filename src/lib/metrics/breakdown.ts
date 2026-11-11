@@ -4,10 +4,10 @@ import { prisma } from "../db"
 import { isoDate } from "../dates"
 import { METRICS_TAG, filterSql, type Filters } from "./index"
 
-/** The weekly "Chart" numbers, one per Sunday. `children` is null when it can't be known (register has no ages). */
+/** The weekly "Chart" numbers, one per Sunday. `children`/`guests` are null when they can't be known (the register has neither). */
 export type Breakdown = {
   workers: number; members: number; firstTimers: number; secondTimers: number
-  total: number; male: number; female: number; children: number | null
+  total: number; male: number; female: number; children: number | null; guests: number | null
 }
 
 export const BREAKDOWN_ROWS: { key: keyof Breakdown; label: string; strong?: boolean }[] = [
@@ -19,6 +19,7 @@ export const BREAKDOWN_ROWS: { key: keyof Breakdown; label: string; strong?: boo
   { key: "male", label: "Male" },
   { key: "female", label: "Female" },
   { key: "children", label: "Children" },
+  { key: "guests", label: "Guests & pastors" },
 ]
 
 /**
@@ -54,7 +55,7 @@ async function _registerBreakdown(fromIso: string, toIso: string, f: Filters, db
       return [isoDate(r.date as Date), {
         workers, firstTimers, secondTimers, total,
         members: total - workers - firstTimers - secondTimers,
-        male: r.male as number, female: r.female as number, children: null,
+        male: r.male as number, female: r.female as number, children: null, guests: null,
       }]
     }),
   )

@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
-import { requireAdminApi } from "@/lib/auth"
+import { requirePermissionApi } from "@/lib/auth"
 import { audit } from "@/lib/audit"
 import { toCsv } from "@/lib/csv-export"
 import { memberStats, referenceService } from "@/lib/metrics"
@@ -10,7 +10,7 @@ import { displayPhone } from "@/lib/phone"
 import { formatDate, isoDate } from "@/lib/dates"
 
 export async function GET(req: Request) {
-  const admin = await requireAdminApi()
+  const admin = await requirePermissionApi("callLists.view")
   if (admin instanceof Response) return admin
   const url = new URL(req.url)
   const key = url.searchParams.get("list") as CallListKey

@@ -82,7 +82,7 @@ describe("parseAttendanceGrid", () => {
 
 describe("headcounts", () => {
   it("validates totals both ways (4 Jan 2026 example)", () => {
-    const v = { workers: 72, members: 30, firstTimers: 8, secondTimers: 4, male: 40, female: 69, children: 5, total: 114 }
+    const v = { workers: 72, members: 30, firstTimers: 8, secondTimers: 4, male: 40, female: 69, children: 5, guests: 0, total: 114 }
     expect(validateHeadcount(utcDate(2026, 0, 4), v, today)).toEqual({ errors: [], warnings: [] })
     expect(validateHeadcount(utcDate(2026, 0, 4), { ...v, total: 115 }, today).warnings).toHaveLength(2)
   })

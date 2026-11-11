@@ -10,16 +10,19 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { displayPhone } from "@/lib/phone"
 import { searchMembersAction } from "@/app/(app)/members/actions"
-import { NAV } from "./app-sidebar"
+import type { Permission } from "@/lib/permissions"
+import { useNav } from "./app-sidebar"
+import { useCan } from "./permissions"
 import { StatusBadge } from "./common"
 
 /** Extra shortcuts shown alongside the pages. */
-const QUICK = [
-  { href: "/members?tab=fix", label: "Members needing fixes", keywords: "missing phone gender flags" },
-  { href: "/members?tab=deleted", label: "Recently deleted members", keywords: "restore trash" },
-  { href: "/uploads#review", label: "Review unmatched people", keywords: "pending approval merge" },
-  { href: "/call-lists#review", label: "Status suggestions", keywords: "review approve" },
-  { href: "/settings#password", label: "Change password", keywords: "account security" },
+const QUICK: { href: string; label: string; keywords: string; perm?: Permission }[] = [
+  { href: "/members?tab=fix", label: "Members needing fixes", keywords: "missing phone gender flags", perm: "members.edit" },
+  { href: "/members?tab=deleted", label: "Recently deleted members", keywords: "restore trash", perm: "members.delete" },
+  { href: "/uploads#review", label: "Review unmatched people", keywords: "pending approval merge", perm: "imports.manage" },
+  { href: "/call-lists#review", label: "Status suggestions", keywords: "review approve", perm: "callLists.manage" },
+  { href: "/account#password", label: "Change password", keywords: "account security" },
+  { href: "/account", label: "My account", keywords: "profile name theme role" },
 ]
 
 function useDebounced<T>(value: T, ms = 250) {
@@ -34,6 +37,8 @@ function useDebounced<T>(value: T, ms = 250) {
 /** ⌘K / Ctrl+K: jump to any page or find a member by name, phone or ID. */
 export function CommandPalette() {
   const router = useRouter()
+  const can = useCan()
+  const nav = useNav()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState("")
   const term = useDebounced(q.trim())
@@ -58,13 +63,13 @@ export function CommandPalette() {
   const members = useQuery({
     queryKey: ["palette-members", term],
     queryFn: () => searchMembersAction(term, 8),
-    enabled: open && term.length >= 2,
+    enabled: open && term.length >= 2 && can("members.view"),
   })
 
   const needle = q.trim().toLowerCase()
-  const pages = NAV.flatMap((g) => g.items.map((i) => ({ ...i, group: g.group })))
+  const pages = nav.flatMap((g) => g.items.map((i) => ({ ...i, group: g.group })))
     .filter((p) => !needle || p.label.toLowerCase().includes(needle) || p.group.toLowerCase().includes(needle))
-  const quick = QUICK.filter((x) => !needle || `${x.label} ${x.keywords}`.toLowerCase().includes(needle))
+  const quick = QUICK.filter((x) => (!x.perm || can(x.perm)) && (!needle || `${x.label} ${x.keywords}`.toLowerCase().includes(needle)))
 
   const go = (href: string) => {
     setOpen(false)

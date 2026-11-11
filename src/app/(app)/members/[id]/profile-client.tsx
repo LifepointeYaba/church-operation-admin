@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Download, GitMerge, Pencil, Trash2, Undo2, X } from "lucide-react"
 import { useActionMutation, useRunAction } from "@/hooks/use-action-mutation"
 import { useConfirm } from "@/components/confirm-dialog"
+import { useCan } from "@/components/permissions"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -64,18 +65,20 @@ export function ProfileActions({ memberId, initial, statuses, deleted }: { membe
   const confirm = useConfirm()
   const [editOpen, setEditOpen] = useState(false)
   const { run, isPending } = useRunAction()
+  const can = useCan()
+  const canDelete = can("members.delete")
   return (
     <div className="flex flex-wrap gap-2">
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      {can("members.edit") && <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogTrigger asChild><Button><Pencil className="size-4" /> Edit</Button></DialogTrigger>
         <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>Edit details</DialogTitle><DialogDescription>Every save is logged and can be reverted.</DialogDescription></DialogHeader>
           <MemberForm memberId={memberId} initial={initial} statuses={statuses} onDone={() => setEditOpen(false)} />
         </DialogContent>
-      </Dialog>
-      <MergeDialog memberId={memberId} />
-      <Button variant="outline" asChild><a href={`/api/export/member/${memberId}`}><Download className="size-4" /> Export data</a></Button>
-      {deleted ? (
+      </Dialog>}
+      {canDelete && <MergeDialog memberId={memberId} />}
+      {can("members.export") && <Button variant="outline" asChild><a href={`/api/export/member/${memberId}`}><Download className="size-4" /> Export data</a></Button>}
+      {!canDelete ? null : deleted ? (
         <Button variant="outline" loading={isPending} onClick={() => run(() => restoreAction(memberId), "Restored")}>{!isPending && <Undo2 className="size-4" />} Restore</Button>
       ) : (
         <Button variant="outline" disabled={isPending} onClick={async () => {
@@ -85,7 +88,7 @@ export function ProfileActions({ memberId, initial, statuses, deleted }: { membe
           <Trash2 className="size-4" /> Delete
         </Button>
       )}
-      <Button
+      {canDelete && <Button
         variant="destructive"
         disabled={isPending}
         onClick={async () => {
@@ -98,7 +101,7 @@ export function ProfileActions({ memberId, initial, statuses, deleted }: { membe
         }}
       >
         Erase permanently
-      </Button>
+      </Button>}
     </div>
   )
 }
@@ -166,6 +169,14 @@ export function TeamsEditor({ memberId, current, all }: { memberId: number; curr
     onFailure: () => { setTeams(current) },
   })
   const update = (next: string[]) => { setTeams(next); save.mutate(next) }
+  const canEdit = useCan()("members.edit")
+  if (!canEdit) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {teams.length === 0 ? <span className="text-sm text-muted-foreground">No team</span> : teams.map((t) => <Badge key={t} variant="secondary">{t}</Badge>)}
+      </div>
+    )
+  }
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
@@ -192,6 +203,7 @@ export function FollowUpForm({ memberId }: { memberId: number }) {
     success: "Follow-up logged",
     onSuccess: () => setFormKey((k) => k + 1),
   })
+  if (!useCan()("followUps.log")) return null
   return (
     <form
       key={formKey}
@@ -218,6 +230,7 @@ export function FollowUpForm({ memberId }: { memberId: number }) {
 export function RevertButton({ auditId }: { auditId: number }) {
   const confirm = useConfirm()
   const revert = useActionMutation(() => revertAction(auditId), { success: "Change reverted" })
+  if (!useCan()("members.delete")) return null
   return (
     <Button size="sm" variant="ghost" loading={revert.isPending} onClick={async () => {
       if (await confirm({ title: "Revert this change?", description: "The details go back to how they were before this change. The revert itself is logged." , confirmLabel: "Revert" })) revert.mutate(undefined)

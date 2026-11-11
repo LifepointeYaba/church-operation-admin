@@ -1,7 +1,7 @@
 /**
  * One-off: recount the weekly headcount of every Sunday that follows the attendance register
  * (filled from an upload or by marking attendance) so it matches who is marked present.
- * Children are kept. Headcounts typed in by hand or from the Chart sheet are only reported, never changed.
+ * Children and guests/pastors are kept and stay in the total. Headcounts typed in by hand or from the Chart sheet are only reported, never changed.
  * Run after `npm run db:migrate`. Dry run by default.
  *   npx tsx --env-file-if-exists=.env.local scripts/recount-headcounts.ts           # show what would change
  *   npx tsx --env-file-if-exists=.env.local scripts/recount-headcounts.ts --apply   # save the changes
@@ -31,7 +31,7 @@ async function main() {
     const r = register[date]
     if (!h || !r) continue
     const values = Object.fromEntries(REGISTER_FIELDS.map((k) => [k, r[k] as number])) as Record<(typeof REGISTER_FIELDS)[number], number>
-    const total = computeTotal(values)
+    const total = computeTotal({ ...values, children: h.children, guests: h.guests })
     const diffs = [...REGISTER_FIELDS, "total" as const]
       .filter((k) => h[k] !== (k === "total" ? total : values[k]))
       .map((k) => `${k} ${h[k]}→${k === "total" ? total : values[k]}`)

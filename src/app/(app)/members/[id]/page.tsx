@@ -1,6 +1,6 @@
 import { Fragment } from "react"
 import { notFound } from "next/navigation"
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { activityOf, memberStats, referenceService } from "@/lib/metrics"
 import { getSettings } from "@/lib/settings"
@@ -20,7 +20,7 @@ const FIELD_LABELS: Record<string, string> = {
 }
 
 export default async function MemberPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin()
+  await requirePermission("members.view")
   const id = Number((await params).id)
   if (!Number.isInteger(id)) notFound()
   const member = await prisma.member.findUnique({

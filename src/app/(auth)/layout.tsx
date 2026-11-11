@@ -18,8 +18,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <img src="/brand/lifepointe-horizontal-color.png" alt="LifePointe" className="w-40 lg:hidden dark:hidden" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/brand/lifepointe-horizontal-white.png" alt="LifePointe" className="hidden w-40 dark:block lg:dark:hidden" />
-            <h1 className="text-2xl font-bold">Welcome back</h1>
-            <p className="text-sm text-muted-foreground">Super Admin access only.</p>
           </div>
           {children}
         </div>

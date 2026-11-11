@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { NavLink } from "@/components/navigation"
 import { Activity, CalendarCheck, TriangleAlert, UserPlus } from "lucide-react"
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { memberStats, monthlyAverages, presentByService, referenceService, servicePoints, type Filters } from "@/lib/metrics"
 import { notesBetween, registerBreakdown } from "@/lib/metrics/breakdown"
@@ -32,7 +32,7 @@ type SP = {
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireAdmin()
+  await requirePermission("dashboard.view")
   const sp = await searchParams
   const ref = await referenceService(sp.date)
   if (!ref) {
@@ -59,6 +59,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ])
   const s = summarize(stats, settings)
   const p = prevStats ? summarize(prevStats, settings) : null
+  // Unfiltered, "present" is the weekly headcount total (same number as on the headcount page).
+  const presentNow = filtered ? s.present : taken[idx].present
+  const presentPrev = filtered ? p?.present : idx > 0 ? taken[idx - 1].present : null
   const lists = callLists(stats, refIso, settings)
   const prevLists = prevStats && prevIso ? callLists(prevStats, prevIso, settings) : null
   const point = taken[idx]
@@ -79,7 +82,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     source === "register" ? registerBreakdown(monthPoints[0].date, monthPoints.at(-1)!.date, filters) : Promise.resolve(null),
     notesBetween(monthPoints[0].date, monthPoints.at(-1)!.date),
   ])
-  const zero = { workers: 0, members: 0, firstTimers: 0, secondTimers: 0, total: 0, male: 0, female: 0, children: null }
+  const zero = { workers: 0, members: 0, firstTimers: 0, secondTimers: 0, total: 0, male: 0, female: 0, children: null, guests: null }
   const columns = monthPoints.map((pt) => ({
     date: pt.date,
     values: register ? (pt.recordTaken ? register[pt.date] ?? zero : null) : pt.headcount,
@@ -126,10 +129,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <p className="text-[13px] font-bold tracking-[0.06em] uppercase">{greeting()}</p>
             <h2 className="mt-1 text-[28px] leading-[34px] font-bold md:text-[40px] md:leading-[46px] md:tracking-[-0.015em]">Sunday {formatDate(refIso, "long")}</h2>
             <div className="mt-3 flex flex-wrap gap-2 text-sm">
-              <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{point.present} marked present</span>
-              {point.headcount
-                ? <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">Headcount {point.headcount.total}</span>
-                : <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">No headcount yet</span>}
+              <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{point.present} present</span>
+              {!point.headcount && <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">No headcount yet</span>}
               {s.streak3 > 0 && <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{s.streak3} on a 3+ week streak</span>}
             </div>
           </div>
@@ -146,7 +147,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {filtered && <Button variant="ghost" size="sm" asChild><NavLink href={hrefWith({ team: undefined, gender: undefined })}>Clear filters</NavLink></Button>}
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Present this Sunday" value={s.present} delta={d(s.present, p?.present)} icon={CalendarCheck} tone="blue" hint={point.headcount && !filtered ? `Headcount ${point.headcount.total}` : undefined} />
+        <StatCard label="Present this Sunday" value={presentNow} delta={d(presentNow, presentPrev)} icon={CalendarCheck} tone="blue" />
         <StatCard label="Active" value={s.active} delta={d(s.active, p?.active)} icon={Activity} tone="good" hint={`Came to ≥1 of last ${settings.atRiskWeeks}`} />
         <StatCard label="At risk" value={s.at_risk} delta={d(s.at_risk, p?.at_risk)} icon={TriangleAlert} tone="amber" lowerIsBetter hint={`Missed ${settings.atRiskWeeks}–${settings.inactiveWeeks - 1} in a row`} />
         <StatCard label="First timers" value={lists.firstTimers.length} delta={d(lists.firstTimers.length, prevLists?.firstTimers.length)} icon={UserPlus} tone="violet" hint={point.headcount && !filtered ? `Headcount: ${point.headcount.firstTimers}` : undefined} />

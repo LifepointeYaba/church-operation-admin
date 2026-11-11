@@ -15,11 +15,11 @@ export function LoginForm({ next }: { next?: string }) {
     <Card>
       <CardHeader>
         <CardTitle>Sign in</CardTitle>
-        <CardDescription>Use your admin email and password.</CardDescription>
+        <CardDescription>New here? Use the temporary password your admin gave you.</CardDescription>
       </CardHeader>
       <CardContent>
         <form action={action} className="space-y-4">
-          <input type="hidden" name="next" value={next ?? "/dashboard"} />
+          <input type="hidden" name="next" value={next ?? "/"} />
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" autoComplete="username" required autoFocus />

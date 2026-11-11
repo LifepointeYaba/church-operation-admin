@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { memberStats, referenceService, servicePoints } from "@/lib/metrics"
 import { CALL_LIST_LABELS, callLists, type CallListKey } from "@/lib/metrics/lists"
@@ -12,7 +12,7 @@ import { CallListTabs, SuggestionReview } from "./call-lists-client"
 export const metadata = { title: "Call lists" }
 
 export default async function CallListsPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
-  await requireAdmin()
+  await requirePermission("callLists.view")
   const { date } = await searchParams
   const ref = await referenceService(date)
   if (!ref) return <EmptyState title="No attendance yet" />

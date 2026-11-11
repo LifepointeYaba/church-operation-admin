@@ -3,37 +3,50 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BarChart3, CalendarCheck, ClipboardList, FileClock, LayoutDashboard, PhoneCall, Settings, Upload, Users,
+  BarChart3, CalendarCheck, ClipboardList, FileClock, LayoutDashboard, PhoneCall, Settings, Upload, UserCog, Users,
+  type LucideIcon,
 } from "lucide-react"
+import type { Permission } from "@/lib/permissions"
+import { useCan } from "./permissions"
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu,
   SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar,
 } from "@/components/ui/sidebar"
 
-export const NAV = [
+type NavItem = { href: string; label: string; icon: LucideIcon; perm: Permission }
+
+export const NAV: { group: string; items: NavItem[] }[] = [
   { group: "Overview", items: [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/trends", label: "Trends", icon: BarChart3 },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, perm: "dashboard.view" },
+    { href: "/trends", label: "Trends", icon: BarChart3, perm: "dashboard.view" },
   ] },
   { group: "Sunday", items: [
-    { href: "/attendance", label: "Mark attendance", icon: CalendarCheck },
-    { href: "/headcount", label: "Weekly headcount", icon: ClipboardList },
-    { href: "/call-lists", label: "Call lists", icon: PhoneCall },
+    { href: "/attendance", label: "Mark attendance", icon: CalendarCheck, perm: "attendance.mark" },
+    { href: "/headcount", label: "Weekly headcount", icon: ClipboardList, perm: "headcount.manage" },
+    { href: "/call-lists", label: "Call lists", icon: PhoneCall, perm: "callLists.view" },
   ] },
   { group: "Records", items: [
-    { href: "/members", label: "Members", icon: Users },
-    { href: "/uploads", label: "Uploads & import", icon: Upload },
+    { href: "/members", label: "Members", icon: Users, perm: "members.view" },
+    { href: "/uploads", label: "Uploads & import", icon: Upload, perm: "imports.manage" },
   ] },
   { group: "Admin", items: [
-    { href: "/settings", label: "Settings", icon: Settings },
-    { href: "/settings/audit", label: "Audit log", icon: FileClock },
+    { href: "/settings", label: "Settings", icon: Settings, perm: "settings.manage" },
+    { href: "/users", label: "Users & roles", icon: UserCog, perm: "users.manage" },
+    { href: "/settings/audit", label: "Audit log", icon: FileClock, perm: "audit.view" },
   ] },
 ]
+
+/** Nav groups filtered to what the signed-in user's role can open. */
+export function useNav() {
+  const can = useCan()
+  return NAV.map((g) => ({ ...g, items: g.items.filter((i) => can(i.perm)) })).filter((g) => g.items.length)
+}
 
 /** `badges` maps a nav href to how many things there need attention. */
 export function AppSidebar({ badges = {} }: { badges?: Record<string, number> }) {
   const pathname = usePathname()
   const { setOpenMobile } = useSidebar()
+  const nav = useNav()
   const isActive = (href: string) =>
     href === "/settings" ? pathname === href : pathname === href || pathname.startsWith(href + "/")
   return (
@@ -42,7 +55,7 @@ export function AppSidebar({ badges = {} }: { badges?: Record<string, number> })
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard">
+              <Link href="/">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/brand/lifepointe-mark.png" alt="" className="size-8 shrink-0" />
                 <div className="grid text-left leading-tight">
@@ -55,7 +68,7 @@ export function AppSidebar({ badges = {} }: { badges?: Record<string, number> })
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {NAV.map((g) => (
+        {nav.map((g) => (
           <SidebarGroup key={g.group}>
             <SidebarGroupLabel className="text-[11px] font-bold tracking-[0.06em] text-muted-foreground uppercase">{g.group}</SidebarGroupLabel>
             <SidebarGroupContent>
