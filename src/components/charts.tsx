@@ -79,7 +79,7 @@ export function AttendanceChart({ sundays, months, defaultFrom = "2025-01-01", a
   )
 }
 
-export type HeadcountPoint = { date: string; workers: number; members: number; firstTimers: number; secondTimers: number; male: number; female: number; children: number | null; guests: number | null }
+export type HeadcountPoint = { date: string; sundayLabel?: string | null; workers: number; members: number; firstTimers: number; secondTimers: number; male: number; female: number; children: number | null; guests: number | null }
 
 const roleConfig = {
   workers: { label: "Workers", color: "var(--chart-1)" },
@@ -102,14 +102,15 @@ export function HeadcountChart({ points, maxBarSize = 28 }: { points: HeadcountP
   const config = split === "role" ? roleConfig : Object.fromEntries(Object.entries(genderConfig)
     .filter(([k]) => !(k === "children" && noChildren) && !(k === "guests" && noGuests))) as Partial<typeof genderConfig>
   const keys = Object.keys(config) as (keyof HeadcountPoint)[]
-  const data = points.map((p) => ({ ...p, label: formatDate(p.date) }))
+  // Special Sundays show their label in the tooltip ("25 Oct 26 · Flicks & Talks"); the axis keeps just the date.
+  const data = points.map((p) => ({ ...p, label: p.sundayLabel ? `${formatDate(p.date)} · ${p.sundayLabel}` : formatDate(p.date) }))
   return (
     <div className="space-y-3">
       <Segmented label="Split" value={split} onChange={setSplit} options={[["role", "Workers / Members / New"], ["gender", noChildren ? "Male / Female" : "Male / Female / Children"]]} />
       <ChartContainer config={config} className="aspect-auto h-72 w-full">
         <BarChart data={data} margin={{ left: 4, right: 12, top: 8 }} accessibilityLayer>
           <CartesianGrid vertical={false} strokeOpacity={0.5} />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={16} tickMargin={8} />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={16} tickMargin={8} tickFormatter={(v: string) => (v.includes(" · ") ? `${v.split(" · ")[0]} ★` : v)} />
           <YAxis tickLine={false} axisLine={false} width={36} allowDecimals={false} />
           <ChartTooltip cursor={{ fillOpacity: 0.3 }} content={<ChartTooltipContent />} />
           <ChartLegend content={<ChartLegendContent />} />

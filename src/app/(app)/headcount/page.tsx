@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { EmptyState, PageHeader } from "@/components/common"
 import { ParamSelect } from "@/components/param-select"
+import { LabelEditor } from "../dashboard/sunday-cards"
 import { HeadcountForm, NotesList, type HeadcountSource, type RegisterNumbers } from "./headcount-client"
 
 export const metadata = { title: "Weekly headcount" }
@@ -107,6 +108,7 @@ export default async function HeadcountPage({ searchParams }: { searchParams: Pr
               register={register}
               source={cur ? sourceOf(cur) : null}
             />
+            {current && <div className="mt-6"><LabelEditor key={chosen} date={chosen} label={current.label} /></div>}
             <div className="mt-6">
               <h3 className="mb-2 text-sm font-medium">Notes for {formatDate(chosen, "long")}</h3>
               <NotesList date={chosen} notes={(current?.notes ?? []).map((n) => ({ id: n.id, type: n.type, text: n.text }))} />

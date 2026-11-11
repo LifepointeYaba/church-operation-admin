@@ -39,6 +39,8 @@ export type ServicePoint = {
   id: number
   date: string
   recordTaken: boolean
+  /** Special-Sunday label ("Flicks & Talks"); null for a regular Sunday. */
+  label: string | null
   present: number
   headcount: null | {
     workers: number; members: number; firstTimers: number; secondTimers: number
@@ -142,7 +144,7 @@ export const missedInARow = (m: MemberStat) => (m.lastRn == null ? null : m.last
 
 async function _servicePoints(): Promise<ServicePoint[]> {
   const rows = await prisma.$queryRaw<Record<string, unknown>[]>`
-    SELECT s.id, s.date, s.record_taken,
+    SELECT s.id, s.date, s.record_taken, s.label,
       -- Present = the weekly headcount total when the Sunday has one, so both numbers always agree.
       COALESCE(h.total, (SELECT COUNT(*)::int FROM attendance a JOIN members m ON m.id = a.member_id
         WHERE a.service_id = s.id AND m.deleted_at IS NULL)) AS present,
@@ -154,6 +156,7 @@ async function _servicePoints(): Promise<ServicePoint[]> {
     id: r.id as number,
     date: isoDate(r.date as Date),
     recordTaken: r.record_taken as boolean,
+    label: (r.label as string | null) || null,
     present: r.present as number,
     headcount:
       r.total == null

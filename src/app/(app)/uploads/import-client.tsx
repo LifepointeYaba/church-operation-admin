@@ -1,13 +1,16 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Check, CopyX, LoaderCircle, TriangleAlert, Upload } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
+import { Check, CopyX, LoaderCircle, Tag, TriangleAlert, Upload } from "lucide-react"
 import { toast } from "@/components/notifications"
 import { useActionMutation } from "@/hooks/use-action-mutation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useCan } from "@/components/permissions"
+import { sundayLabelsAction } from "../dashboard/actions"
 import { commitAttendanceImport, previewAttendanceImport } from "./actions"
 
 type Preview = Extract<Awaited<ReturnType<typeof previewAttendanceImport>>, { ok: true }>
@@ -34,6 +37,7 @@ export function AttendanceImport() {
   const [error, setError] = useState<string | null>(null)
   const [blockedDuplicate, setBlockedDuplicate] = useState<Duplicate | null>(null)
   const [allowDuplicate, setAllowDuplicate] = useState(false)
+  const [labels, setLabels] = useState<Record<string, string>>({})
   const fd = () => {
     const f = new FormData()
     f.set("file", file!)
@@ -47,6 +51,7 @@ export function AttendanceImport() {
     setError(null)
     setBlockedDuplicate(null)
     setAllowDuplicate(false)
+    setLabels({})
   }
 
   // Preview (read the file) and import both go through React Query mutations.
@@ -54,15 +59,20 @@ export function AttendanceImport() {
     refresh: false,
     onSuccess: (result) => {
       setPreview(result)
+      setLabels(Object.fromEntries(result.serviceDates.map((s) => [s.date, s.label ?? ""])))
       if (result.duplicate.blocked) toast.warning("This upload looks like a duplicate", { description: "Check the notice below before importing." })
       else toast.info("Preview ready", { description: "Check the numbers, then press Import." })
     },
     onFailure: (r) => { setError(r.error) },
   })
   const importMutation = useActionMutation(
-    (v: { form: FormData; createNoPhone: boolean; allowDuplicate: boolean }) => commitAttendanceImport(v.form, v.createNoPhone, v.allowDuplicate),
+    (v: { form: FormData; createNoPhone: boolean; allowDuplicate: boolean; labels: Record<string, string> }) =>
+      commitAttendanceImport(v.form, v.createNoPhone, v.allowDuplicate, v.labels),
     {
-      success: (r) => ({ title: "Import finished", description: `${r.attendanceAdded} present marks added, ${r.membersAdded} new people.` }),
+      success: (r) => ({
+        title: "Import finished",
+        description: `${r.attendanceAdded} present marks added, ${r.membersAdded} new people${r.labelsSet ? `, ${r.labelsSet} Sunday ${r.labelsSet === 1 ? "label" : "labels"} saved` : ""}.`,
+      }),
       onSuccess: (result) => { setDone(result); setPreview(null); setAllowDuplicate(false) },
       onFailure: (r) => {
         if ("duplicate" in r && r.duplicate) setBlockedDuplicate(r.duplicate as Duplicate)
@@ -80,7 +90,9 @@ export function AttendanceImport() {
 
   function importFile() {
     setError(null)
-    importMutation.mutate({ form: fd(), createNoPhone, allowDuplicate })
+    // Only send labels that changed from what the Sunday already has.
+    const changed = Object.fromEntries(Object.entries(labels).filter(([d, l]) => l.trim() !== (preview?.serviceDates.find((s) => s.date === d)?.label ?? "")))
+    importMutation.mutate({ form: fd(), createNoPhone, allowDuplicate, labels: changed })
   }
 
   return (
@@ -161,6 +173,10 @@ export function AttendanceImport() {
               </AlertDescription>
             </Alert>
           )}
+          {preview.serviceDates.length > 0 && (
+            <SundayLabels dates={preview.serviceDates.map((s) => s.date)} labels={labels} disabled={busy}
+              onChange={(date, label) => setLabels((l) => ({ ...l, [date]: label }))} />
+          )}
           <label className="flex items-center gap-2">
             <Checkbox checked={createNoPhone} onCheckedChange={(c) => setCreateNoPhone(!!c)} />
             Create new records for people without a phone whose name matches more than one existing record
@@ -192,6 +208,41 @@ export function AttendanceImport() {
             )}
           </AlertDescription>
         </Alert>
+      )}
+    </div>
+  )
+}
+
+/** Label each Sunday in the file ("Flicks & Talks"); blank = regular Sunday. */
+function SundayLabels({ dates, labels, disabled, onChange }: {
+  dates: string[]; labels: Record<string, string>; disabled: boolean; onChange: (date: string, label: string) => void
+}) {
+  const canLabel = useCan()("headcount.manage")
+  const known = useQuery({ queryKey: ["sunday-labels"], queryFn: () => sundayLabelsAction(), enabled: canLabel })
+  if (!canLabel) return null
+  const suggestions = known.data ?? []
+  return (
+    <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+      <div>
+        <p className="flex items-center gap-1.5 font-medium"><Tag className="size-4" /> Sunday labels <span className="font-normal text-muted-foreground">(optional)</span></p>
+        <p className="text-xs text-muted-foreground">Was any of these a special Sunday, like Flicks &amp; Talks? Leave blank for a regular Sunday. Saved when you import.</p>
+      </div>
+      <datalist id="import-sunday-labels">{suggestions.map((l) => <option key={l} value={l} />)}</datalist>
+      <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+        {[...dates].reverse().map((d) => (
+          <li key={d} className="flex items-center gap-2">
+            <label htmlFor={`label-${d}`} className="w-28 shrink-0 tabular-nums">{formatDate(d)}</label>
+            <Input id={`label-${d}`} className="h-8" value={labels[d] ?? ""} disabled={disabled} maxLength={60}
+              placeholder="Regular Sunday" list="import-sunday-labels" onChange={(e) => onChange(d, e.target.value)} />
+          </li>
+        ))}
+      </ul>
+      {suggestions.length > 0 && dates.length === 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {suggestions.slice(0, 6).map((l) => (
+            <button key={l} type="button" disabled={disabled} onClick={() => onChange(dates[0], l)} className="rounded-full border px-2 py-0.5 text-xs hover:bg-muted">{l}</button>
+          ))}
+        </div>
       )}
     </div>
   )

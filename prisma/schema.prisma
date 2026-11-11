@@ -99,6 +99,8 @@ model Service {
   date        DateTime @unique @db.Date
   type        String   @default("sunday")
   recordTaken Boolean  @default(true) @map("record_taken")
+  /// What kind of Sunday it was, e.g. "Flicks & Talks" or "Easter". Empty means a regular Sunday.
+  label       String?
 
   attendance Attendance[]
   headcounts ServiceHeadcount[]

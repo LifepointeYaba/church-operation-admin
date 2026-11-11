@@ -14,7 +14,7 @@ import { getSettings } from "@/lib/settings"
 import type { Prisma } from "@prisma/client"
 import type { ParsedPerson } from "@/lib/import/attendance"
 import { matchAttendancePerson } from "@/lib/import/matching"
-import { nameKey as makeNameKey } from "@/lib/keys"
+import { cleanName, nameKey as makeNameKey } from "@/lib/keys"
 import { normalizePhone } from "@/lib/phone"
 import { createHash } from "node:crypto"
 
@@ -76,8 +76,9 @@ export async function previewAttendanceImport(form: FormData) {
       where: { deletedAt: null },
       select: { id: true, nameKey: true, phoneKey: true, email: true },
     })
-    const services = await prisma.service.findMany({ select: { date: true } })
+    const services = await prisma.service.findMany({ select: { date: true, label: true } })
     const haveDates = new Set(services.map((s) => s.date.toISOString().slice(0, 10)))
+    const labelOf = new Map(services.map((s) => [s.date.toISOString().slice(0, 10), s.label]))
     const matches = parsed.people.map((person) => ({ person, result: matchAttendancePerson(person, existing) }))
     const matched = matches.filter(({ result }) => result.kind === "matched").length
     const unmatchedExisting = matches.filter(({ person, result }) => person.firstTime === false && result.kind === "unmatched")
@@ -92,6 +93,8 @@ export async function previewAttendanceImport(form: FormData) {
       flagged: parsed.people.filter((p) => p.flags.length).length,
       sundays: parsed.services.length,
       newSundays: parsed.services.filter((s) => !haveDates.has(s.date)).length,
+      /** Each Sunday in the file with its current label, so labels can be set before importing. */
+      serviceDates: [...new Set(parsed.services.map((s) => s.date))].sort().map((date) => ({ date, label: labelOf.get(date) ?? null })),
       marks: parsed.people.reduce((a, p) => a + p.present.length, 0),
       rejectedColumns: parsed.rejectedColumns,
       rejectedRows: parsed.rejectedRows,
@@ -102,7 +105,11 @@ export async function previewAttendanceImport(form: FormData) {
   }
 }
 
-export async function commitAttendanceImport(form: FormData, createUnmatchedNoPhone: boolean, allowDuplicate = false) {
+export async function commitAttendanceImport(
+  form: FormData, createUnmatchedNoPhone: boolean, allowDuplicate = false,
+  /** Sunday labels chosen in the preview, by ISO date ("" = regular Sunday). */
+  labels: Record<string, string> = {},
+) {
   await requirePermission("imports.manage")
   let uploadId: number | null = null
   try {
@@ -124,6 +131,7 @@ export async function commitAttendanceImport(form: FormData, createUnmatchedNoPh
     uploadId = upload.id
     const sum = await applyAttendanceImport(prisma, parsed, { createUnmatchedNoPhone })
     const headcount = await syncHeadcountsFromRegister(prisma, serviceDates, upload.id)
+    const labelsSet = await applySundayLabels(serviceDates, labels, upload.id)
     await prisma.upload.update({
       where: { id: upload.id },
       data: {
@@ -135,7 +143,7 @@ export async function commitAttendanceImport(form: FormData, createUnmatchedNoPh
     })
     await audit("import", "upload", upload.id, null, { ...sum, reimport: duplicate.blocked })
     refreshData()
-    return { ok: true as const, ...sum, headcount }
+    return { ok: true as const, ...sum, headcount, labelsSet }
   } catch (e) {
     const error = e instanceof Error ? e.message : "Import failed"
     if (uploadId !== null) {
@@ -144,6 +152,21 @@ export async function commitAttendanceImport(form: FormData, createUnmatchedNoPh
     }
     return { ok: false as const, error }
   }
+}
+
+/** Save labels for Sundays in this upload; each change is audited. Returns how many changed. */
+async function applySundayLabels(dates: string[], labels: Record<string, string>, uploadId: number) {
+  let changed = 0
+  for (const date of dates) {
+    if (!(date in labels)) continue
+    const next = cleanName(labels[date]).slice(0, 60) || null
+    const service = await prisma.service.findUnique({ where: { date: new Date(`${date}T00:00:00Z`) } })
+    if (!service || service.label === next) continue
+    await prisma.service.update({ where: { id: service.id }, data: { label: next } })
+    await audit("service_label", "service", date, { label: service.label }, { label: next, uploadId })
+    changed++
+  }
+  return changed
 }
 
 function jsonObject(value: Prisma.JsonValue | null): Prisma.JsonObject | null {

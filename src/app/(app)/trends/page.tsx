@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState, PageHeader, StatCard, shortStatus } from "@/components/common"
 import { AttendanceChart, CohortChart, HBarChart, HeadcountChart } from "@/components/charts"
 import { TrendFilters } from "./filters"
+import { SpecialSundays } from "./special-sundays"
 
 export const metadata = { title: "Trends" }
 
@@ -60,7 +61,10 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
   const months = monthlyAverages(
     points.filter((p) => p.date >= from && p.date <= to).map((p) => ({ ...p, present: presentOf(p), headcount: filtered ? null : p.headcount })),
   )
-  const hc = points.filter((p) => p.headcount && p.date >= from && p.date <= to).map((p) => ({ date: p.date, ...p.headcount! }))
+  const hc = points.filter((p) => p.headcount && p.date >= from && p.date <= to).map((p) => ({ date: p.date, sundayLabel: p.label, ...p.headcount! }))
+  const labelled = points
+    .filter((p) => p.recordTaken && p.date >= from && p.date <= to)
+    .map((p) => ({ date: p.date, label: p.label, attendance: presentOf(p), firstTimers: filtered ? null : p.headcount?.firstTimers ?? null }))
   const cohortInRange = cohortRows.filter((c) => `${c.month}-01` >= from.slice(0, 7) + "-01" && `${c.month}-01` <= to)
 
   const counts = { active: 0, at_risk: 0, inactive: 0 }
@@ -97,6 +101,13 @@ export default async function TrendsPage({ searchParams }: { searchParams: Promi
         <Card>
           <CardHeader><CardTitle>Headcount split</CardTitle><CardDescription>Each Sunday, from the weekly headcount.</CardDescription></CardHeader>
           <CardContent>{hc.length ? <HeadcountChart points={hc} /> : <EmptyState title="No headcounts in this range" />}</CardContent>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Special Sundays</CardTitle>
+            <CardDescription>Labelled Sundays compared with the average regular Sunday in this range{filtered ? " (filtered group)" : ""}.</CardDescription>
+          </CardHeader>
+          <CardContent><SpecialSundays sundays={labelled} /></CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>First-timer retention</CardTitle><CardDescription>By month of first visit.</CardDescription></CardHeader>

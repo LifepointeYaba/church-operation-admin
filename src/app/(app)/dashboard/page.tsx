@@ -88,6 +88,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     values: register ? (pt.recordTaken ? register[pt.date] ?? zero : null) : pt.headcount,
     present: pt.recordTaken ? pt.present : null,
     notes: notes[pt.date] ?? [],
+    label: pt.label,
+    hasService: true,
   }))
   const prevMonthDate = taken.filter((t) => t.date < `${month}-01`).at(-1)?.date ?? null
   const laterMonth = taken.find((t) => t.date.slice(0, 7) > month)?.date.slice(0, 7)
@@ -129,6 +131,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <p className="text-[13px] font-bold tracking-[0.06em] uppercase">{greeting()}</p>
             <h2 className="mt-1 text-[28px] leading-[34px] font-bold md:text-[40px] md:leading-[46px] md:tracking-[-0.015em]">Sunday {formatDate(refIso, "long")}</h2>
             <div className="mt-3 flex flex-wrap gap-2 text-sm">
+              {point.label && <span className="rounded-full bg-white px-3 py-1 font-semibold text-[#c2410c]">{point.label}</span>}
               <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{point.present} present</span>
               {!point.headcount && <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">No headcount yet</span>}
               {s.streak3 > 0 && <span className="rounded-full bg-white/20 px-3 py-1 font-semibold">{s.streak3} on a 3+ week streak</span>}

@@ -6,8 +6,12 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { HeadcountChart } from "@/components/charts"
 import { ViewToggle } from "@/components/view-toggle"
+import { SundayCards } from "./sunday-cards"
 
-type Column = { date: string; values: Breakdown | null; present: number | null; notes: { type: string; text: string }[] }
+type Column = {
+  date: string; values: Breakdown | null; present: number | null; notes: { type: string; text: string }[]
+  label: string | null; hasService: boolean
+}
 
 const avg = (xs: (number | null | undefined)[]) => {
   const v = xs.filter((x): x is number => x != null)
@@ -20,8 +24,7 @@ export function SundayNumbers({ month, columns, selected, source, prevHref, next
   prevHref: string | null; nextHref: string | null; hrefFor: (date: string) => string
 }) {
   const title = new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
-  const hasNotes = columns.some((c) => c.notes.length)
-  const points = columns.flatMap((c) => (c.values ? [{ date: c.date, ...c.values }] : []))
+  const points = columns.flatMap((c) => (c.values ? [{ date: c.date, sundayLabel: c.label, ...c.values }] : []))
   return (
     <div className="space-y-3">
       <ViewToggle
@@ -50,6 +53,7 @@ export function SundayNumbers({ month, columns, selected, source, prevHref, next
               {columns.map((c) => (
                 <th key={c.date} scope="col" className={cn("px-4 py-2.5 text-right text-xs font-semibold whitespace-nowrap text-muted-foreground", c.date === selected && "bg-primary-soft text-primary")}>
                   <NavLink href={hrefFor(c.date)} className="hover:underline">{formatDate(c.date)}</NavLink>
+                  {c.label && <div className="mt-0.5 truncate text-[11px] font-medium text-primary" title={c.label}>{c.label}</div>}
                 </th>
               ))}
               <th scope="col" className="border-l px-4 py-2.5 text-right text-xs font-semibold whitespace-nowrap text-muted-foreground">Average</th>
@@ -91,18 +95,10 @@ export function SundayNumbers({ month, columns, selected, source, prevHref, next
             : <p className="text-sm text-muted-foreground">No numbers for this month yet.</p>
         }
       />
-      {hasNotes && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {columns.filter((c) => c.notes.length).map((c) => (
-            <div key={c.date} className={cn("rounded-md border p-3 text-sm", c.date === selected && "border-primary/40 bg-primary/5")}>
-              <p className="mb-1 font-medium">{formatDate(c.date, "long")}</p>
-              <ul className="space-y-0.5 text-muted-foreground">
-                {c.notes.map((n, i) => <li key={i} className={cn(n.text.toLowerCase().endsWith("distribution") && "pt-1 font-medium text-foreground first:pt-0")}>{n.text}</li>)}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
+      <SundayCards
+        selected={selected}
+        cards={columns.filter((c) => c.hasService || c.notes.length).map((c) => ({ date: c.date, label: c.label, notes: c.notes, hasService: c.hasService && c.present != null }))}
+      />
     </div>
   )
 }
