@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client"
 import { unstable_cache } from "next/cache"
 import { prisma } from "../db"
 import { isoDate } from "../dates"
+import { autoNotesBetween } from "../auto-notes"
 import { METRICS_TAG, filterSql, type Filters } from "./index"
 
 /** The weekly "Chart" numbers, one per Sunday. `children`/`guests` are null when they can't be known (the register has neither). */
@@ -66,13 +67,15 @@ export const registerBreakdownNow = _registerBreakdown
 
 export const registerBreakdown = unstable_cache((fromIso: string, toIso: string, f: Filters) => _registerBreakdown(fromIso, toIso, f), ["register-breakdown"], { tags: [METRICS_TAG], revalidate: 3600 })
 
+/** Each Sunday's saved notes; Sundays without any get notes worked out from the attendance register. */
 export async function notesBetween(fromIso: string, toIso: string) {
-  const notes = await prisma.serviceNote.findMany({
+  const [notes, auto] = await Promise.all([prisma.serviceNote.findMany({
     where: { service: { date: { gte: new Date(`${fromIso}T00:00:00Z`), lte: new Date(`${toIso}T00:00:00Z`) } } },
     include: { service: { select: { date: true } } },
     orderBy: [{ serviceId: "asc" }, { id: "asc" }],
-  })
+  }), autoNotesBetween(fromIso, toIso)])
   const by: Record<string, { type: string; text: string }[]> = {}
   for (const n of notes) (by[isoDate(n.service.date)] ??= []).push({ type: n.type, text: n.text })
+  for (const [d, list] of Object.entries(auto)) by[d] ??= list
   return by
 }

@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { EmptyState, PageHeader, StatCard } from "@/components/common"
-import { PersonList } from "@/components/person-list"
 import { ParamSelect } from "@/components/param-select"
 import { AttendanceChart } from "@/components/charts"
 import { SundayNumbers } from "./sunday-numbers"
@@ -65,7 +64,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const lists = callLists(stats, refIso, settings)
   const prevLists = prevStats && prevIso ? callLists(prevStats, prevIso, settings) : null
   const point = taken[idx]
-  const prevPoint = idx > 0 ? taken[idx - 1] : null
   const d = (a: number, b: number | undefined | null) => (b == null ? null : a - b)
 
   // Links keep the current filters.
@@ -217,55 +215,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           />
         </CardContent>
       </Card>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Came last Sunday, not this one ({s.cameLastNotThis.length})</CardTitle>
-            <CardDescription>{prevPoint ? `Present ${formatDate(prevPoint.date, "long")}` : ""}</CardDescription>
-          </CardHeader>
-          <CardContent><PersonList people={s.cameLastNotThis} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Here this Sunday, not last ({s.cameThisNotLast.length})</CardTitle></CardHeader>
-          <CardContent><PersonList people={s.cameThisNotLast} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Newly at risk ({lists.newlyAtRisk.length})</CardTitle>
-            <CardDescription>Just missed {settings.atRiskWeeks} in a row after {settings.minVisitsForRisk}+ visits.</CardDescription>
-          </CardHeader>
-          <CardContent><PersonList people={lists.newlyAtRisk} empty="No one newly at risk" /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Regulars slipping away ({lists.slippingRegulars.length})</CardTitle>
-            <CardDescription>Came 3+ times in the 12 weeks before, absent all of the last {settings.atRiskWeeks}.</CardDescription>
-          </CardHeader>
-          <CardContent><PersonList people={lists.slippingRegulars} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Status needs review ({s.mismatches.length})</CardTitle>
-            <CardDescription>Marked “Not Active” but attended in the last {settings.atRiskWeeks} Sundays.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <PersonList people={s.mismatches} />
-            {s.mismatches.length > 0 && <Button variant="outline" size="sm" className="mt-3" asChild><Link href="/call-lists#review">Review suggestions</Link></Button>}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle className="text-base">Streaks of 3+ ({s.streak3})</CardTitle></CardHeader>
-          <CardContent><PersonList people={s.streaks} extra={(m) => `${m.streak} in a row`} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Returnees ({s.returnees.length})</CardTitle>
-            <CardDescription>Back after missing {settings.inactiveWeeks}+ Sundays.</CardDescription>
-          </CardHeader>
-          <CardContent><PersonList people={s.returnees} extra={(m) => `Last seen ${m.prevDate ? formatDate(m.prevDate) : "—"} · away ${m.prevRn! - 2}`} empty="No returnees this Sunday" /></CardContent>
-        </Card>
-      </div>
     </div>
   )
 }

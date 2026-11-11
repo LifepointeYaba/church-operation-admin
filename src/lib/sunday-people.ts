@@ -1,5 +1,7 @@
 import { prisma } from "./db"
 import { isoDate } from "./dates"
+import { parseDistributionLine } from "./note-match"
+import { autoNotesBetween } from "./auto-notes"
 
 export type SundayPerson = { id: number; name: string; phone: string | null; status: string }
 export type PersonGroup = { key: string; title: string; people: SundayPerson[] }
@@ -8,8 +10,11 @@ export type SundayDetails = {
   date: string
   label: string | null
   present: number
-  /** Notes for the day; `people` are those present whose name the note mentions. */
-  notes: { id: number; text: string; people: SundayPerson[] }[]
+  /**
+   * Notes for the day. `people`: for "1 returned from last week" lines, the second timers it counts
+   * (`stated` is the note's number); otherwise anyone present whose name the note mentions.
+   */
+  notes: { id: number; text: string; people: SundayPerson[]; stated: number | null }[]
   firstTimers: SundayPerson[]
   /** Second timers, grouped by when they first came (the "returned from …" lines). */
   secondTimers: PersonGroup[]
@@ -72,15 +77,26 @@ export async function sundayDetails(dateIso: string, breakWeeks: number): Promis
   }
   const newestFirst = (m: Map<string, PersonGroup>) => [...m.values()].sort((a, b) => b.key.localeCompare(a.key))
 
-  // Link notes like "Taiwo God's Heritage came 3 times in a row" to the person, when they were present.
+  const prevSunday = here > 0 ? sundays[here - 1] ?? null : null
   const people = rows.map(person)
-  const notes = service.notes.map((n) => {
+  // No saved notes: use the ones worked out from the register (negative ids, they aren't stored).
+  const sourceNotes = service.notes.length
+    ? service.notes
+    : ((await autoNotesBetween(dateIso, dateIso))[dateIso] ?? []).map((n, i) => ({ id: -(i + 1), text: n.text }))
+  const notes = sourceNotes.map((n) => {
+    // "2 returned from 20 September" → the second timers whose first visit was 20 Sept.
+    const line = parseDistributionLine(n.text, dateIso)
+    if (line) {
+      const matched = [...second.values()].filter((g) => line.matches(g.key, prevSunday)).flatMap((g) => g.people)
+      return { id: n.id, text: n.text, people: matched, stated: line.count }
+    }
+    // "Taiwo God's Heritage came 3 times in a row" → that person, when they were present.
     const text = ` ${norm(n.text)} `
     const named = people.filter((p) => {
       const parts = norm(p.name).split(" ").filter((w) => w.length > 1)
       return parts.length >= 2 && parts.every((w) => text.includes(` ${w} `))
     })
-    return { id: n.id, text: n.text, people: named }
+    return { id: n.id, text: n.text, people: named, stated: null }
   })
 
   return {

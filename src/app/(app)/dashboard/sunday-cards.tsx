@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useQuery } from "@tanstack/react-query"
-import { ChevronRight, Tag } from "lucide-react"
+import { ChevronDown, ChevronRight, Tag } from "lucide-react"
 import { useActionMutation } from "@/hooks/use-action-mutation"
 import { useCan } from "@/components/permissions"
 import { Badge } from "@/components/ui/badge"
@@ -89,6 +89,46 @@ function Section({ title, hint, count, children }: { title: string; hint?: strin
   )
 }
 
+type Note = { id: number; text: string; people: SundayPerson[]; stated: number | null }
+
+/** A note line; when it's about specific people ("1 returned from last week"), click to show them. */
+function NoteLine({ note }: { note: Note }) {
+  const [open, setOpen] = useState(false)
+  const heading = note.text.toLowerCase().endsWith("distribution")
+  const linkable = note.stated != null || note.people.length > 0
+  if (!linkable) {
+    return <li className={cn("px-2 py-1", heading ? "pt-2 font-medium text-foreground" : "text-muted-foreground")}>{note.text}</li>
+  }
+  const differs = note.stated != null && note.stated !== note.people.length
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left hover:bg-muted"
+      >
+        <span className="underline decoration-dotted underline-offset-4">{note.text}</span>
+        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+          {note.people.length} {note.people.length === 1 ? "person" : "people"}
+          <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+        </span>
+      </button>
+      {open && (
+        <div className="ml-2 border-l pl-2">
+          {differs && (
+            <p className="px-2 py-1 text-xs text-amber-600 dark:text-amber-400">
+              The note says {note.stated}; the register shows {note.people.length}.
+            </p>
+          )}
+          {note.people.length ? <ul>{note.people.map((p) => <PersonRow key={p.id} p={p} />)}</ul>
+            : <p className="px-2 py-1 text-xs text-muted-foreground">No matching second timers in the register.</p>}
+        </div>
+      )}
+    </li>
+  )
+}
+
 function Groups({ groups }: { groups: PersonGroup[] }) {
   return (
     <div className="space-y-2">
@@ -130,13 +170,9 @@ function SundayDialog({ card, onClose }: { card: SundayCard | null; onClose: () 
             {d.notes.length > 0 && (
               <section className="space-y-1.5">
                 <h3 className="text-sm font-semibold">Notes</h3>
-                <ul className="space-y-1 text-sm">
-                  {d.notes.map((n) => (
-                    <li key={n.id}>
-                      <span className="text-muted-foreground">{n.text}</span>
-                      {n.people.length > 0 && <ul className="mt-0.5">{n.people.map((p) => <PersonRow key={p.id} p={p} />)}</ul>}
-                    </li>
-                  ))}
+                <p className="text-xs text-muted-foreground">Click a line to see who it’s about.</p>
+                <ul className="space-y-0.5 text-sm">
+                  {d.notes.map((n) => <NoteLine key={n.id} note={n} />)}
                 </ul>
               </section>
             )}
