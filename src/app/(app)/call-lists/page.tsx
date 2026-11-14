@@ -8,6 +8,7 @@ import { formatDate, isoDate } from "@/lib/dates"
 import { EmptyState, PageHeader } from "@/components/common"
 import { SundayPicker } from "@/components/sunday-picker"
 import { CallListTabs, SuggestionReview } from "./call-lists-client"
+import { fillTemplate, whatsappLink } from "@/lib/first-timers-shared"
 
 export const metadata = { title: "Call lists" }
 
@@ -27,6 +28,20 @@ export default async function CallListsPage({ searchParams }: { searchParams: Pr
     include: { member: { select: { firstName: true, lastName: true, phone: true } } },
     orderBy: [{ toStatus: "asc" }, { createdAt: "asc" }],
   })
+  // First timers: WhatsApp with the pre-defined message, unless they said their number isn't on WhatsApp.
+  const forms = await prisma.firstTimerResponse.findMany({
+    where: { memberId: { in: lists.firstTimers.map((m) => m.id) } },
+    orderBy: { createdAt: "desc" },
+    select: { memberId: true, onWhatsapp: true },
+  })
+  const onWhatsapp = new Map<number, boolean>()
+  for (const f of forms) if (f.memberId && !onWhatsapp.has(f.memberId)) onWhatsapp.set(f.memberId, f.onWhatsapp)
+  const sundayLabel = `Sunday ${formatDate(refIso, "long")}`
+  const whatsappFor = (key: CallListKey, m: { id: number; firstName: string; phone: string | null }) => {
+    if (key !== "firstTimers") return undefined
+    if (onWhatsapp.get(m.id) === false) return null
+    return whatsappLink(m.phone, fillTemplate(settings.whatsappFirstTimerMessage, { firstName: m.firstName, sunday: sundayLabel }))
+  }
   const order: CallListKey[] = ["firstTimers", "secondTimers", "slippingRegulars", "newlyAtRisk", "newlyInactive", "workersMissed"]
   return (
     <div className="space-y-6">
@@ -42,7 +57,7 @@ export default async function CallListsPage({ searchParams }: { searchParams: Pr
           label: CALL_LIST_LABELS[k],
           people: lists[k].map((m) => ({
             id: m.id, name: `${m.firstName} ${m.lastName}`.trim(), phone: m.phone, status: m.status, teams: m.teams,
-            personResponsible: m.personResponsible, lastDate: m.lastDate,
+            personResponsible: m.personResponsible, lastDate: m.lastDate, whatsapp: whatsappFor(k, m),
           })),
         }))}
       />

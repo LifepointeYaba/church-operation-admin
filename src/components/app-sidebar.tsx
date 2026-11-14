@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  BarChart3, CalendarCheck, ClipboardList, FileClock, LayoutDashboard, PhoneCall, Settings, Upload, UserCog, Users,
+  BarChart3, CalendarCheck, ClipboardList, FileClock, LayoutDashboard, PhoneCall, QrCode, Settings, Upload, UserCog, Users,
   type LucideIcon,
 } from "lucide-react"
 import type { Permission } from "@/lib/permissions"
@@ -22,6 +22,7 @@ export const NAV: { group: string; items: NavItem[] }[] = [
   ] },
   { group: "Sunday", items: [
     { href: "/attendance", label: "Mark attendance", icon: CalendarCheck, perm: "attendance.mark" },
+    { href: "/first-timers", label: "First timer link", icon: QrCode, perm: "attendance.mark" },
     { href: "/headcount", label: "Weekly headcount", icon: ClipboardList, perm: "headcount.manage" },
     { href: "/call-lists", label: "Call lists", icon: PhoneCall, perm: "callLists.view" },
   ] },

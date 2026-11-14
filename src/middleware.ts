@@ -4,7 +4,8 @@ import { authConfig } from "@/lib/auth.config"
 
 const { auth } = NextAuth(authConfig)
 
-const PUBLIC = ["/login", "/reset-password", "/api/auth"]
+// /welcome is the public first-timer form (shared by link / QR code).
+const PUBLIC = ["/login", "/reset-password", "/api/auth", "/welcome"]
 
 export default auth((req) => {
   const { pathname } = req.nextUrl

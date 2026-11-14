@@ -76,3 +76,15 @@ export async function deleteTeamAction(id: number) {
   refreshData()
   return { ok: true }
 }
+
+export async function saveWhatsappMessageAction(message: string) {
+  await requirePermission("settings.manage")
+  const text = message.trim()
+  if (!text) return { ok: false, error: "Enter a message" }
+  if (text.length > 1000) return { ok: false, error: "Keep the message under 1000 characters" }
+  const before = (await getSettings()).whatsappFirstTimerMessage
+  await saveSetting("whatsappFirstTimerMessage", text)
+  await audit("settings_update", "settings", "whatsappFirstTimerMessage", before, text)
+  refreshData()
+  return { ok: true }
+}

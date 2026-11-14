@@ -3,6 +3,7 @@ import type { AttendanceParseResult, ParsedPerson } from "./attendance"
 import { matchAttendancePerson } from "./matching"
 import { promoteFoundMembers } from "../status-progression"
 import type { HeadcountRow, ParsedNote } from "./headcount"
+import { linkSundaysWithResponses, needsLinkReview } from "../first-timers"
 
 type Db = PrismaClient
 
@@ -11,7 +12,8 @@ export type ImportSummary = {
   membersUpdated: number
   membersPromoted: number
   membersNeedingConfirm: { row: number; name: string }[]
-  membersPendingApproval: { row: number; person: ParsedPerson }[]
+  /** `not_on_link`: a new person on a Sunday whose first-timer link was used, but they didn't register on it. */
+  membersPendingApproval: { row: number; person: ParsedPerson; reason?: "not_matched" | "not_on_link" }[]
   servicesAdded: number
   attendanceAdded: number
   rejected: { row?: number; header?: string; reason: string }[]
@@ -74,6 +76,7 @@ export async function applyAttendanceImport(
   const idForRow = new Map<number, number>()
   const foundIds = new Set<number>()
   const toCreate: typeof parsed.people = []
+  const linkSundays = await linkSundaysWithResponses(db, parsed.services.map((s) => s.date))
 
   for (const p of parsed.people) {
     const result = matchAttendancePerson(p, existing)
@@ -94,7 +97,9 @@ export async function applyAttendanceImport(
         summary.membersUpdated++
       }
     } else if (p.firstTime === false) {
-      summary.membersPendingApproval.push({ row: p.row, person: p })
+      summary.membersPendingApproval.push({ row: p.row, person: p, reason: "not_matched" })
+    } else if (needsLinkReview(p, linkSundays)) {
+      summary.membersPendingApproval.push({ row: p.row, person: p, reason: "not_on_link" })
     } else {
       toCreate.push(p)
     }

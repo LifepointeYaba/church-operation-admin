@@ -69,6 +69,7 @@ model Member {
   statusHistory    StatusHistory[]
   followUps        FollowUp[]
   suggestions      StatusSuggestion[]
+  firstTimerForms  FirstTimerResponse[]
 
   @@unique([nameKey, phoneKey])
   @@index([phoneKey])
@@ -108,6 +109,52 @@ model Service {
   firstSeen  Member[]           @relation("FirstSeen")
 
   @@map("services")
+}
+
+/// A public first-timer form link for one Sunday (shared as a URL and QR code).
+model FirstTimerLink {
+  id          Int      @id @default(autoincrement())
+  token       String   @unique
+  serviceDate DateTime @unique @map("service_date") @db.Date
+  active      Boolean  @default(true)
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  responses FirstTimerResponse[]
+
+  @@map("first_timer_links")
+}
+
+/// One first-timer form submission. The person is also created/matched as a member and marked present.
+model FirstTimerResponse {
+  id              Int      @id @default(autoincrement())
+  linkId          Int      @map("link_id")
+  memberId        Int?     @map("member_id")
+  fullName        String   @map("full_name")
+  phone           String
+  phoneKey        String?  @map("phone_key")
+  email           String?
+  gender          String?
+  birthday        String?
+  address         String?
+  howHeard        String?  @map("how_heard")
+  churchHome      String?  @map("church_home")
+  interests       String[] @default([])
+  growth          String[] @default([])
+  prayerRequest   String?  @map("prayer_request")
+  comments        String?
+  improve         String?
+  onWhatsapp      Boolean  @default(true) @map("on_whatsapp")
+  /// True when the phone matched someone already registered (they were marked present, not re-created).
+  matchedExisting Boolean  @default(false) @map("matched_existing")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  link   FirstTimerLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  member Member?        @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  @@unique([linkId, phoneKey])
+  @@index([memberId])
+  @@map("first_timer_responses")
 }
 
 model Attendance {

@@ -17,6 +17,7 @@ import { matchAttendancePerson } from "@/lib/import/matching"
 import { cleanName, nameKey as makeNameKey } from "@/lib/keys"
 import { normalizePhone } from "@/lib/phone"
 import { createHash } from "node:crypto"
+import { linkSundaysWithResponses, needsLinkReview } from "@/lib/first-timers"
 
 async function read(form: FormData) {
   const file = form.get("file")
@@ -46,11 +47,14 @@ async function findDuplicateUpload(fileHash: string, parsed: ParsedAttendance) {
       orderBy: { uploadedAt: "desc" },
       select: { id: true, fileName: true, uploadedAt: true },
     }),
+    // Marks added by the first-timer form don't count as "already uploaded".
     dates.length
-      ? prisma.service.findMany({
-        where: { date: { in: dates.map((d) => new Date(`${d}T00:00:00.000Z`)) }, attendance: { some: {} } },
-        select: { date: true },
-      })
+      ? prisma.$queryRaw<{ date: Date }[]>`
+        SELECT DISTINCT s.date FROM services s JOIN attendance a ON a.service_id = s.id
+        WHERE s.date = ANY(${dates}::date[])
+          AND NOT EXISTS (
+            SELECT 1 FROM first_timer_responses r JOIN first_timer_links l ON l.id = r.link_id
+            WHERE r.member_id = a.member_id AND l.service_date = s.date)`
       : Promise.resolve([]),
   ])
   const alreadyRecorded = recorded.map((s) => s.date.toISOString().slice(0, 10)).sort()
@@ -79,15 +83,20 @@ export async function previewAttendanceImport(form: FormData) {
     const services = await prisma.service.findMany({ select: { date: true, label: true } })
     const haveDates = new Set(services.map((s) => s.date.toISOString().slice(0, 10)))
     const labelOf = new Map(services.map((s) => [s.date.toISOString().slice(0, 10), s.label]))
+    const linkSundays = await linkSundaysWithResponses(prisma, parsed.services.map((s) => s.date))
     const matches = parsed.people.map((person) => ({ person, result: matchAttendancePerson(person, existing) }))
     const matched = matches.filter(({ result }) => result.kind === "matched").length
-    const unmatchedExisting = matches.filter(({ person, result }) => person.firstTime === false && result.kind === "unmatched")
+    const toReview = (person: ParsedPerson) => person.firstTime === false || needsLinkReview(person, linkSundays)
+    const unmatchedExisting = matches.filter(({ person, result }) => toReview(person) && result.kind === "unmatched")
     const needsConfirm = matches.filter(({ result }) => result.kind === "ambiguous")
     return {
       ok: true as const,
       people: parsed.people.length,
       matched,
-      added: matches.filter(({ person, result }) => person.firstTime !== false && result.kind === "unmatched").length,
+      added: matches.filter(({ person, result }) => !toReview(person) && result.kind === "unmatched").length,
+      /** First timers in the file who are on a Sunday with a first-timer link but didn't register on it. */
+      notOnLink: matches.filter(({ person, result }) => person.firstTime !== false && needsLinkReview(person, linkSundays) && result.kind === "unmatched").length,
+      linkSundays: [...linkSundays],
       pendingApproval: unmatchedExisting.map(({ person }) => ({ row: person.row, name: `${person.firstName} ${person.lastName}`.trim() })),
       needsConfirm: needsConfirm.map(({ person }) => ({ row: person.row, name: `${person.firstName} ${person.lastName}`.trim() })),
       flagged: parsed.people.filter((p) => p.flags.length).length,

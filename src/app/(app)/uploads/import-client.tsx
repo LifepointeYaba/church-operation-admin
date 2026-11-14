@@ -145,7 +145,10 @@ export function AttendanceImport() {
           {preview.pendingApproval.length > 0 && (
             <Alert>
               <AlertDescription>
-                <p className="font-medium">Unmatched existing attendees will wait for approval after import</p>
+                <p className="font-medium">These people will wait for approval after import</p>
+                {preview.notOnLink > 0 && (
+                  <p className="text-sm">{preview.notOnLink} {preview.notOnLink === 1 ? "is a first timer who" : "are first timers who"} didn’t register on the first-timer link for {preview.linkSundays.map(formatDate).join(", ")}. First timers who did register are matched and skipped automatically.</p>
+                )}
                 <ul className="list-disc pl-4">
                   {preview.pendingApproval.map((person) => <li key={person.row}>{person.name} (row {person.row})</li>)}
                 </ul>

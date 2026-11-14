@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { AppSettings } from "@/lib/settings"
+import { DEFAULT_WHATSAPP_MESSAGE, fillTemplate } from "@/lib/first-timers-shared"
 import {
-  addTeamAction, deleteTeamAction, renameTeamAction, saveStatusesAction, saveThresholdsAction,
+  addTeamAction, deleteTeamAction, renameTeamAction, saveStatusesAction, saveThresholdsAction, saveWhatsappMessageAction,
 } from "./actions"
 
 /** Save/delete helper: React Query mutation with loading state and success/failure alerts. */
@@ -89,5 +90,22 @@ export function TeamsManager({ teams }: { teams: { id: number; name: string; cou
         ))}
       </ul>
     </div>
+  )
+}
+
+export function WhatsappMessageForm({ initial }: { initial: string }) {
+  const { pending, act } = useAct()
+  const [text, setText] = useState(initial)
+  return (
+    <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); act(() => saveWhatsappMessageAction(text), "WhatsApp message saved") }}>
+      <Textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} aria-label="WhatsApp message" />
+      <p className="text-xs text-muted-foreground">
+        Preview: {fillTemplate(text, { firstName: "Jane", sunday: "Sunday 15 Nov" })}
+      </p>
+      <div className="flex gap-2">
+        <Button loading={pending}>Save</Button>
+        <Button type="button" variant="ghost" onClick={() => setText(DEFAULT_WHATSAPP_MESSAGE)}>Reset to default</Button>
+      </div>
+    </form>
   )
 }

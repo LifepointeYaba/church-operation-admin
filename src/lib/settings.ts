@@ -1,4 +1,5 @@
 import { prisma } from "./db"
+import { DEFAULT_WHATSAPP_MESSAGE } from "./first-timers-shared"
 
 export const DEFAULT_STATUSES = [
   "First Timer",
@@ -16,6 +17,8 @@ export type AppSettings = {
   minVisitsForRisk: number
   workerMissWeeks: number
   statuses: string[]
+  /** Pre-filled WhatsApp message for first timers. {firstName} and {sunday} are filled in. */
+  whatsappFirstTimerMessage: string
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -24,6 +27,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   minVisitsForRisk: 3,
   workerMissWeeks: 2,
   statuses: DEFAULT_STATUSES,
+  whatsappFirstTimerMessage: DEFAULT_WHATSAPP_MESSAGE,
 }
 
 export async function getSettings(): Promise<AppSettings> {

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { getSettings } from "@/lib/settings"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PageHeader } from "@/components/common"
-import { StatusesForm, TeamsManager, ThresholdsForm } from "./settings-client"
+import { StatusesForm, TeamsManager, ThresholdsForm, WhatsappMessageForm } from "./settings-client"
 
 export const metadata = { title: "Settings" }
 
@@ -24,6 +24,10 @@ export default async function SettingsPage() {
         <Card>
           <CardHeader><CardTitle className="text-base">Statuses</CardTitle><CardDescription>One per line, in journey order.</CardDescription></CardHeader>
           <CardContent><StatusesForm initial={settings.statuses} /></CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">WhatsApp message to first timers</CardTitle><CardDescription>Pre-filled when you tap WhatsApp on the first timers call list. Use {"{firstName}"} and {"{sunday}"}.</CardDescription></CardHeader>
+          <CardContent><WhatsappMessageForm initial={settings.whatsappFirstTimerMessage} /></CardContent>
         </Card>
         <Card className="lg:row-span-2">
           <CardHeader><CardTitle className="text-base">Teams</CardTitle><CardDescription>Rename a team to an existing name to merge them.</CardDescription></CardHeader>

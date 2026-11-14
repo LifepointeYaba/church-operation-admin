@@ -21,7 +21,7 @@ export default async function UploadsPage() {
     prisma.upload.findMany({ orderBy: { uploadedAt: "desc" }, take: 200 }),
     getSettings(),
   ])
-  const pendingUploads = uploads.flatMap((upload) => {
+  const pendingUploadsRaw = uploads.flatMap((upload) => {
     const summary = upload.summary
     if (!summary || typeof summary !== "object" || Array.isArray(summary)) return []
     const pending = (summary as Prisma.JsonObject).membersPendingApproval
@@ -39,10 +39,28 @@ export default async function UploadsPage() {
         phone: typeof details.phone === "string" ? details.phone : null,
         email: typeof details.email === "string" ? details.email : null,
         gender: typeof details.gender === "string" ? details.gender : null,
+        reason: entry.reason === "not_on_link" ? "not_on_link" as const : "not_matched" as const,
       }]
     })
-    return people.length ? [{ id: upload.id, fileName: upload.fileName, people }] : []
+    const dates = (summary as Prisma.JsonObject).serviceDates
+    const serviceDates = Array.isArray(dates) ? dates.filter((d): d is string => typeof d === "string") : []
+    return people.length ? [{ id: upload.id, fileName: upload.fileName, people, serviceDates }] : []
   })
+  // People who registered on the first-timer link for those Sundays: offered as quick merge targets.
+  const linkDates = [...new Set(pendingUploadsRaw.flatMap((u) => u.serviceDates))]
+  const registrants = linkDates.length
+    ? await prisma.firstTimerResponse.findMany({
+      where: { link: { serviceDate: { in: linkDates.map((d) => new Date(`${d}T00:00:00.000Z`)) } }, member: { deletedAt: null } },
+      select: { link: { select: { serviceDate: true } }, member: { select: { id: true, firstName: true, lastName: true, phone: true, altPhone: true, email: true, gender: true, status: true } } },
+      orderBy: { createdAt: "asc" },
+    })
+    : []
+  const pendingUploads = pendingUploadsRaw.map(({ serviceDates, ...u }) => ({
+    ...u,
+    linkRegistrants: registrants
+      .filter((r) => r.member && serviceDates.includes(r.link.serviceDate.toISOString().slice(0, 10)))
+      .map((r) => r.member!),
+  }))
   return (
     <div className="stagger space-y-4">
       <PageHeader title="Uploads & import" description="Re-importing updates matching people (name + phone) and Sundays instead of duplicating them." />
@@ -60,7 +78,7 @@ export default async function UploadsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Pending member approvals</CardTitle>
-            <CardDescription>These attendees were marked First Time = No but did not match a registered person. Search existing members by name, phone, or email to link the attendance and fill blank profile details, or create a new record or reject the row.</CardDescription>
+            <CardDescription>These attendees didn’t match a registered person: either they were marked First Time = No, or they’re first timers who didn’t register on that Sunday’s first-timer link. Pick a match (link registrants are listed first) to merge the attendance and fill blank details, create a new record, or reject the row.</CardDescription>
           </CardHeader>
           <CardContent><PendingAttendanceReviews uploads={pendingUploads} statuses={settings.statuses} /></CardContent>
         </Card>

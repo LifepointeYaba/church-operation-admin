@@ -13,8 +13,8 @@ import { resolvePendingAttendanceImport, searchPendingAttendanceMembers } from "
 
 type SearchResult = Extract<Awaited<ReturnType<typeof searchPendingAttendanceMembers>>, { ok: true }>
 type MemberCandidate = SearchResult["members"][number]
-type PendingPerson = { row: number; name: string; phone: string | null; email: string | null; gender: string | null }
-type PendingUpload = { id: number; fileName: string; people: PendingPerson[] }
+type PendingPerson = { row: number; name: string; phone: string | null; email: string | null; gender: string | null; reason: "not_matched" | "not_on_link" }
+type PendingUpload = { id: number; fileName: string; people: PendingPerson[]; linkRegistrants: MemberCandidate[] }
 
 export function PendingAttendanceReviews({ uploads, statuses }: { uploads: PendingUpload[]; statuses: string[] }) {
   if (!uploads.length) return null
@@ -27,7 +27,9 @@ export function PendingAttendanceReviews({ uploads, statuses }: { uploads: Pendi
           <h3 className="text-sm font-semibold">Review people from {upload.fileName}</h3>
           <ul className="divide-y">
             {upload.people.map((person) => (
-              <PendingPersonReview key={person.row} uploadId={upload.id} person={person} statuses={statuses} defaultStatus={defaultStatus} />
+              <PendingPersonReview key={person.row} uploadId={upload.id} person={person} statuses={statuses}
+                defaultStatus={person.reason === "not_on_link" && statuses.includes("First Timer") ? "First Timer" : defaultStatus}
+                suggestions={person.reason === "not_on_link" ? upload.linkRegistrants : []} />
             ))}
           </ul>
         </section>
@@ -41,15 +43,17 @@ function PendingPersonReview({
   person,
   statuses,
   defaultStatus,
+  suggestions,
 }: {
   uploadId: number
   person: PendingPerson
   statuses: string[]
   defaultStatus: string
+  suggestions: MemberCandidate[]
 }) {
   const confirm = useConfirm()
   const [query, setQuery] = useState(person.name)
-  const [members, setMembers] = useState<MemberCandidate[]>([])
+  const [members, setMembers] = useState<MemberCandidate[]>(suggestions)
   const [selected, setSelected] = useState<MemberCandidate | null>(null)
   const [status, setStatus] = useState(defaultStatus)
   // Searching is a read, so it uses a plain React Query mutation (no page refresh).
@@ -91,7 +95,10 @@ function PendingPersonReview({
   return (
     <li className="space-y-3 py-4">
       <div>
-        <p className="font-medium">{person.name} <span className="text-muted-foreground">(row {person.row})</span></p>
+        <p className="font-medium">
+          {person.name} <span className="text-muted-foreground">(row {person.row})</span>
+          {person.reason === "not_on_link" && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">First timer · not on link</span>}
+        </p>
         <p className="text-xs text-muted-foreground">
           Uploaded: {[person.phone, person.email, person.gender].filter(Boolean).join(" · ") || "No contact details"}
         </p>
@@ -114,6 +121,7 @@ function PendingPersonReview({
       )}
       {!searchMutation.isPending && members.length > 0 && (
         <ul className="space-y-2 rounded-md bg-muted/40 p-3">
+          {members === suggestions && <li className="text-xs font-medium text-muted-foreground">Registered on the first-timer link that Sunday — pick one to merge, or search above</li>}
           {members.map((member) => (
             <li key={member.id}>
               <button
