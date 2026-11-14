@@ -16,25 +16,31 @@ const EMPTY: Form = {
   interests: [], growth: [], prayerRequest: "", comments: "", improve: "", onWhatsapp: true, website: "",
 }
 
-const field = "w-full rounded-xl border border-input bg-background px-4 py-3 text-base outline-none transition focus:border-[#c2410c] focus:ring-2 focus:ring-[#c2410c]/20"
+// text-base (16px) stops iPhones zooming in when a field is tapped.
+const field = "w-full min-w-0 rounded-xl border border-input bg-background px-4 py-3 text-base outline-none transition focus:border-[#c2410c] focus:ring-2 focus:ring-[#c2410c]/20"
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
+    <section className="space-y-4 rounded-2xl border bg-card p-4 shadow-sm sm:p-6">
       <h2 className="text-sm font-bold tracking-[0.06em] uppercase">{title}</h2>
       {children}
     </section>
   )
 }
 
-function Field({ label, required, children, hint }: { label: string; required?: boolean; children: React.ReactNode; hint?: string }) {
+function Field({ label, required, children, hint, wide }: { label: string; required?: boolean; children: React.ReactNode; hint?: string; wide?: boolean }) {
   return (
-    <label className="block space-y-1.5">
+    <label className={cn("block min-w-0 space-y-1.5", wide && "md:col-span-2")}>
       <span className="text-[15px] font-medium">{label}{required && <span className="text-red-600"> *</span>}</span>
       {children}
       {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
     </label>
   )
+}
+
+/** One column on phones, two from tablet width up. */
+function Grid({ children }: { children: React.ReactNode }) {
+  return <div className="grid gap-4 md:grid-cols-2">{children}</div>
 }
 
 function Chips({ options, value, onChange, label }: { options: string[]; value: string[]; onChange: (v: string[]) => void; label: string }) {
@@ -81,7 +87,7 @@ export function WelcomeForm({ token, sunday }: { token: string; sunday: string }
 
   if (done) {
     return (
-      <div className="animate-fade-up flex min-h-[80svh] flex-col items-center justify-center gap-6 text-center">
+      <div className="animate-fade-up mx-auto flex min-h-[80svh] max-w-lg flex-col items-center justify-center gap-6 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/lifepointe-horizontal-color.png" alt="LifePointe" className="w-56 dark:hidden" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -99,24 +105,32 @@ export function WelcomeForm({ token, sunday }: { token: string; sunday: string }
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5" noValidate>
-      <header className="space-y-3 pt-4 pb-2 text-center">
-        <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#c2410c] text-white shadow-lg shadow-orange-500/20">
-          <Heart className="size-8 fill-current" />
+    <div className="mx-auto grid max-w-xl gap-6 md:max-w-3xl lg:max-w-none lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-12">
+      {/* Phones/tablets: heading on top. Laptops: heading stays put on the left while the form scrolls. */}
+      <header className="space-y-3 pt-2 text-center lg:sticky lg:top-10 lg:self-start lg:pt-8 lg:text-left">
+        <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#c2410c] text-white shadow-lg shadow-orange-500/20 sm:size-16 lg:mx-0">
+          <Heart className="size-7 fill-current sm:size-8" />
         </div>
-        <h1 className="font-display text-4xl font-bold tracking-tight">Welcome Home</h1>
-        <p className="text-muted-foreground">We’re so glad you joined us today. Fill this out so we can stay connected and help you take your next step.</p>
-        <p className="text-xs font-semibold tracking-wide text-[#c2410c] uppercase">Sunday {sunday}</p>
+        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">Welcome Home</h1>
+        <p className="text-muted-foreground sm:text-lg">We’re so glad you joined us today. Fill this out so we can stay connected and help you take your next step.</p>
+        <p className="text-xs font-semibold tracking-wide text-[#c2410c] uppercase sm:text-sm">Sunday {sunday}</p>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/lifepointe-horizontal-color.png" alt="LifePointe" className="hidden w-40 pt-6 lg:block dark:lg:hidden" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/lifepointe-horizontal-white.png" alt="LifePointe" className="hidden w-40 pt-6 dark:lg:block" />
       </header>
 
+    <form onSubmit={submit} className="min-w-0 space-y-5" noValidate>
+
       <Section title="Your details">
+        <Grid>
         <Field label="Full Name" required>
           <input className={field} autoComplete="name" placeholder="Jane Doe" value={f.fullName} onChange={(e) => set("fullName", e.target.value)} />
         </Field>
         <Field label="Phone Number" required>
           <input className={field} type="tel" inputMode="tel" autoComplete="tel" placeholder="0803 123 4567" value={f.phone} onChange={(e) => set("phone", e.target.value)} />
         </Field>
-        <label className="flex items-center gap-2 text-[15px]">
+        <label className="flex items-center gap-2 text-[15px] md:col-span-2 md:-mt-1">
           <input type="checkbox" className="size-4 accent-[#c2410c]" checked={f.onWhatsapp} onChange={(e) => set("onWhatsapp", e.target.checked)} />
           This number is on WhatsApp
         </label>
@@ -140,9 +154,11 @@ export function WelcomeForm({ token, sunday }: { token: string; sunday: string }
         <Field label="Address">
           <input className={field} autoComplete="street-address" placeholder="Yaba, Lagos" value={f.address} onChange={(e) => set("address", e.target.value)} />
         </Field>
+        </Grid>
       </Section>
 
       <Section title="About your visit">
+        <Grid>
         <Field label="How did you hear about us?">
           <select className={field} value={f.howHeard} onChange={(e) => set("howHeard", e.target.value)}>
             <option value="">Select an option</option>
@@ -155,18 +171,21 @@ export function WelcomeForm({ token, sunday }: { token: string; sunday: string }
             {CHURCH_HOME.map((o) => <option key={o}>{o}</option>)}
           </select>
         </Field>
+        </Grid>
       </Section>
 
-      <Section title="I'm interested in">
-        <Chips label="I'm interested in" options={INTERESTS} value={f.interests} onChange={(v) => set("interests", v)} />
-      </Section>
-
-      <Section title="I'd like to grow in">
-        <Chips label="I'd like to grow in" options={GROWTH} value={f.growth} onChange={(v) => set("growth", v)} />
-      </Section>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Section title="I'm interested in">
+          <Chips label="I'm interested in" options={INTERESTS} value={f.interests} onChange={(v) => set("interests", v)} />
+        </Section>
+        <Section title="I'd like to grow in">
+          <Chips label="I'd like to grow in" options={GROWTH} value={f.growth} onChange={(v) => set("growth", v)} />
+        </Section>
+      </div>
 
       <Section title="Anything else?">
-        <Field label="Prayer Request">
+        <Grid>
+        <Field label="Prayer Request" wide>
           <textarea className={field} rows={3} placeholder="How can we pray for you?" value={f.prayerRequest} onChange={(e) => set("prayerRequest", e.target.value)} />
         </Field>
         <Field label="Comments">
@@ -175,6 +194,7 @@ export function WelcomeForm({ token, sunday }: { token: string; sunday: string }
         <Field label="How can we improve?">
           <textarea className={field} rows={3} placeholder="Any feedback for us?" value={f.improve} onChange={(e) => set("improve", e.target.value)} />
         </Field>
+        </Grid>
       </Section>
 
       {/* Honeypot for bots: hidden from people and screen readers. */}
@@ -183,10 +203,11 @@ export function WelcomeForm({ token, sunday }: { token: string; sunday: string }
       {error && <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">{error}</p>}
 
       <button type="submit" disabled={pending}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#c2410c] px-6 py-4 text-lg font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-[#a5370a] disabled:opacity-70">
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#c2410c] px-6 py-4 active:scale-[0.99] text-lg font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-[#a5370a] disabled:opacity-70">
         {pending && <Loader2 className="size-5 animate-spin" />} Submit
       </button>
       <p className="pb-6 text-center text-sm text-muted-foreground">Your information is kept private and used only to follow up with you.</p>
     </form>
+    </div>
   )
 }

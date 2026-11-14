@@ -19,8 +19,8 @@ export default async function WelcomePage({ params }: { params: Promise<{ token:
         ? `This form opens the day before Sunday ${formatDate(isoDate(link.serviceDate), "long")}.`
         : null
   return (
-    <main className="min-h-svh bg-gradient-to-b from-orange-50 via-background to-background px-4 py-8 dark:from-orange-950/20">
-      <div className="mx-auto w-full max-w-lg">
+    <main className="min-h-svh bg-gradient-to-b from-orange-50 via-background to-background px-4 py-6 sm:px-6 sm:py-10 lg:px-10 dark:from-orange-950/20">
+      <div className={message ? "mx-auto w-full max-w-lg" : "mx-auto w-full max-w-6xl"}>
         {message
           ? (
             <div className="space-y-4 pt-16 text-center">

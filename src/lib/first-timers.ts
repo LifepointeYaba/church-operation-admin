@@ -165,3 +165,64 @@ export function needsLinkReview(person: { firstTime?: boolean; present: string[]
   if (person.firstTime === false || !person.present.length) return false
   return linkSundays.has([...person.present].sort()[0])
 }
+
+/**
+ * Undo one form registration: remove the present mark it added (keeping the headcount in step),
+ * delete the person if the form created them and they have no other attendance, and remove the
+ * Sunday itself if nothing else was recorded on it.
+ */
+export async function deleteRegistration(responseId: number) {
+  const r = await prisma.firstTimerResponse.findUnique({ where: { id: responseId }, include: { link: true } })
+  if (!r) throw new Error("Registration not found")
+  const dateIso = isoDate(r.link.serviceDate)
+  let memberDeleted = false
+  await prisma.$transaction(async (tx) => {
+    await tx.firstTimerResponse.delete({ where: { id: r.id } })
+    const service = await tx.service.findUnique({ where: { date: r.link.serviceDate } })
+    if (r.memberId && service) {
+      const memberId = r.memberId
+      await syncHeadcountsForMark(tx, memberId, dateIso, async () => {
+        await tx.attendance.deleteMany({ where: { memberId, serviceId: service.id } })
+      })
+      const [otherMarks, otherForms] = await Promise.all([
+        tx.attendance.count({ where: { memberId } }),
+        tx.firstTimerResponse.count({ where: { memberId } }),
+      ])
+      if (!r.matchedExisting && otherMarks === 0 && otherForms === 0) {
+        await tx.member.delete({ where: { id: memberId } })
+        memberDeleted = true
+      } else {
+        await tx.$executeRaw`
+          UPDATE members SET first_seen_service_id = (
+            SELECT a.service_id FROM attendance a JOIN services s ON s.id = a.service_id
+            WHERE a.member_id = ${memberId} ORDER BY s.date LIMIT 1)
+          WHERE id = ${memberId}`
+      }
+    }
+    if (service) await removeEmptyService(tx, service.id)
+  }, { timeout: 30_000, maxWait: 10_000 })
+  await audit("first_timer_registration_delete", "first_timer_response", r.id, { name: r.fullName, phone: r.phone, date: dateIso, memberId: r.memberId }, { memberDeleted })
+  return { name: r.fullName, memberDeleted }
+}
+
+/** Delete a link, every registration on it and the attendance those registrations added. */
+export async function deleteLink(linkId: number) {
+  const link = await prisma.firstTimerLink.findUnique({ where: { id: linkId }, include: { responses: { select: { id: true } } } })
+  if (!link) throw new Error("Link not found")
+  let membersDeleted = 0
+  for (const r of link.responses) if ((await deleteRegistration(r.id)).memberDeleted) membersDeleted++
+  await prisma.firstTimerLink.delete({ where: { id: linkId } })
+  await audit("first_timer_link_delete", "first_timer_link", linkId, { date: isoDate(link.serviceDate), registrations: link.responses.length }, { membersDeleted })
+  return { registrations: link.responses.length, membersDeleted }
+}
+
+/** A Sunday left with no attendance, notes or hand-entered headcount was only there because of the form. */
+async function removeEmptyService(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], serviceId: number) {
+  const s = await tx.service.findUnique({
+    where: { id: serviceId },
+    select: { label: true, _count: { select: { attendance: true, notes: true } }, headcounts: { select: { fromRegister: true, uploadId: true } } },
+  })
+  if (!s || s._count.attendance || s._count.notes || s.label) return
+  if (s.headcounts.some((h) => !h.fromRegister || h.uploadId)) return
+  await tx.service.delete({ where: { id: serviceId } })
+}
