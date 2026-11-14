@@ -1,45 +1,19 @@
 import Link from "next/link"
-import type { MemberStat } from "@/lib/metrics"
-import { prisma } from "@/lib/db"
+import type { AbsentMember } from "@/lib/metrics/absent"
+import { ALL_STATUSES } from "@/lib/metrics/absent"
 import { displayPhone } from "@/lib/phone"
 import { formatDate } from "@/lib/dates"
 import { ParamSelect } from "@/components/param-select"
 import { HBarChart } from "@/components/charts"
 import { ViewToggle } from "@/components/view-toggle"
 import { StatusBadge, shortStatus } from "@/components/common"
+import { AbsentExportButton } from "./absent-export-button"
+import { AbsentDateRange } from "./absent-date-range"
 
-/** Status filter value meaning "every status, including Not Active". The default (empty) hides Not Active. */
-export const ALL_STATUSES = "all"
-
-/** The latest Sunday in the most recent attendance upload, used as this card's default date. */
-export async function lastUploadedSunday(): Promise<string | null> {
-  const uploads = await prisma.upload.findMany({
-    where: { kind: "attendance", status: { not: "failed" } },
-    orderBy: { uploadedAt: "desc" },
-    take: 5,
-    select: { summary: true },
-  })
-  for (const u of uploads) {
-    const dates = (u.summary as { serviceDates?: unknown } | null)?.serviceDates
-    if (Array.isArray(dates)) {
-      const latest = dates.filter((d): d is string => typeof d === "string").sort().at(-1)
-      if (latest) return latest
-    }
-  }
-  return null
-}
-
-/** People not marked present on the chosen Sunday (who had started attending by then). */
-export function absentOn(stats: MemberStat[], statusFilter: string) {
-  return stats
-    .filter((m) => !m.p1 && m.lastRn != null)
-    .filter((m) => statusFilter ? true : m.status !== "Not Active")
-    .sort((a, b) => (a.lastRn! - b.lastRn!) || a.firstName.localeCompare(b.firstName))
-}
-
-export function AbsentMembers({ people, date, dates, team, teams, status, statuses, gender }: {
-  people: MemberStat[]
-  date: string
+export function AbsentMembers({ people, from, to, dates, team, teams, status, statuses, gender }: {
+  people: AbsentMember[]
+  from: string
+  to: string
   dates: string[]
   team: string
   teams: string[]
@@ -50,15 +24,14 @@ export function AbsentMembers({ people, date, dates, team, teams, status, status
   const byStatus = new Map<string, number>()
   for (const m of people) byStatus.set(m.status, (byStatus.get(m.status) ?? 0) + 1)
   const statusData = [...byStatus].map(([name, value]) => ({ name: shortStatus(name), value })).sort((a, b) => b.value - a.value)
-  const empty = <p className="text-sm text-muted-foreground">Everyone matching these filters came.</p>
+  const empty = <p className="text-sm text-muted-foreground">No one matching these filters last came in this date range.</p>
 
   return (
     <ViewToggle
       id="absent-members"
       toolbar={
         <>
-          <ParamSelect className="min-w-0 flex-1 sm:flex-none" name="abs_date" label="Sunday" value={date}
-            options={dates.map((d) => ({ value: d, label: formatDate(d, "long") }))} />
+          <AbsentDateRange from={from} to={to} min={dates.at(-1)} max={dates[0]} />
           <ParamSelect className="min-w-0 flex-1 sm:flex-none" name="abs_team" label="Workers' team" value={team}
             options={[{ value: "", label: "All teams" }, ...teams.map((t) => ({ value: t, label: t }))]} />
           <ParamSelect className="min-w-0 flex-1 sm:flex-none" name="abs_status" label="Status" value={status}
@@ -69,6 +42,8 @@ export function AbsentMembers({ people, date, dates, team, teams, status, status
             ]} />
           <ParamSelect className="min-w-0 flex-1 sm:flex-none" name="abs_gender" label="Gender" value={gender}
             options={[{ value: "", label: "Any gender" }, { value: "Female", label: "Female" }, { value: "Male", label: "Male" }]} />
+          <AbsentExportButton disabled={people.length === 0}
+            params={{ abs_from: from, abs_to: to, abs_team: team, abs_status: status, abs_gender: gender }} />
         </>
       }
       chart={statusData.length ? (
@@ -102,7 +77,7 @@ export function AbsentMembers({ people, date, dates, team, teams, status, status
                   <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">{m.gender ?? "—"}</td>
                   <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">{m.teams.join(", ") || "—"}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{m.lastDate ? formatDate(m.lastDate) : "—"}</td>
-                  <td className="px-3 py-2 text-right tabular-nums" title="Sundays missed in a row">{m.lastRn! - 1}</td>
+                  <td className="px-3 py-2 text-right tabular-nums" title="Sundays missed since they last came">{m.lastRn! - 1}</td>
                 </tr>
               ))}
             </tbody>

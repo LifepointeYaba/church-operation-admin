@@ -16,7 +16,8 @@ import { ParamSelect } from "@/components/param-select"
 import { AttendanceChart } from "@/components/charts"
 import { SundayNumbers } from "./sunday-numbers"
 import { MISSED_OPTIONS } from "./absent-workers"
-import { ALL_STATUSES, AbsentMembers, absentOn, lastUploadedSunday } from "./absent-members"
+import { AbsentMembers } from "./absent-members"
+import { absentMembers as loadAbsent } from "@/lib/metrics/absent"
 
 export const metadata = { title: "Dashboard" }
 
@@ -27,7 +28,7 @@ function greeting() {
 
 type SP = {
   date?: string; team?: string; gender?: string; source?: string; missed?: string
-  abs_date?: string; abs_team?: string; abs_status?: string; abs_gender?: string
+  abs_from?: string; abs_to?: string; abs_team?: string; abs_status?: string; abs_gender?: string
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -99,20 +100,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .sort((a, b) => (a.lastDate ?? "").localeCompare(b.lastDate ?? ""))
 
   // "Who didn't come" card: its own filters, defaulting to the latest Sunday in the last upload.
-  const takenDates = taken.map((t) => t.date)
-  const lastUploaded = await lastUploadedSunday()
-  const absDate = [sp.abs_date, lastUploaded].find((d) => d && takenDates.includes(d)) ?? takenDates.at(-1)!
-  const absStatus = sp.abs_status === ALL_STATUSES || settings.statuses.includes(sp.abs_status ?? "") ? sp.abs_status! : ""
-  const absGender = sp.abs_gender === "Female" || sp.abs_gender === "Male" ? sp.abs_gender : ""
-  const absTeam = teams.some((t) => t.name === sp.abs_team) ? sp.abs_team! : ""
-  const absentMembers = absentOn(
-    await memberStats(absDate, {
-      team: absTeam || undefined,
-      gender: absGender || undefined,
-      status: absStatus && absStatus !== ALL_STATUSES ? absStatus : undefined,
-    }),
-    absStatus,
-  )
+  const abs = (await loadAbsent(sp, settings.statuses))!
+
 
   const chartSundays = (filteredPresent ?? taken)
     .filter((t) => t.date <= refIso)
@@ -189,16 +178,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </Card>
       <Card id="absent-members">
         <CardHeader>
-          <CardTitle>Absent Members ({absentMembers.length})</CardTitle>
+          <CardTitle>Absent Members ({abs.people.length})</CardTitle>
           <CardDescription>
-            People not marked present on {formatDate(absDate, "long")}{absDate === lastUploaded ? " (last uploaded Sunday)" : ""}. Only people who had started attending by then are listed. These filters only affect this card.
+            People whose last visit was between {formatDate(abs.from, "long")} and {formatDate(abs.to, "long")} and who haven’t come since (as of {formatDate(abs.asOf, "long")}). These filters only affect this card.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <AbsentMembers
-            people={absentMembers} date={absDate} dates={[...takenDates].reverse()}
-            team={absTeam} teams={teams.map((t) => t.name)}
-            status={absStatus} statuses={settings.statuses} gender={absGender}
+            people={abs.people} from={abs.from} to={abs.to} dates={[...taken].map((t) => t.date).reverse()}
+            team={abs.team} teams={teams.map((t) => t.name)}
+            status={abs.status} statuses={settings.statuses} gender={abs.gender}
           />
         </CardContent>
       </Card>
