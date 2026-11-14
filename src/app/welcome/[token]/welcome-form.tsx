@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { Heart, Loader2 } from "lucide-react"
+import { ChevronDown, Heart, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { BIBLE_VERSES, CHURCH_HOME, GROWTH, HOW_HEARD, INTERESTS } from "@/lib/first-timers-shared"
 import { submitFirstTimerAction } from "../actions"
@@ -35,6 +35,19 @@ function Field({ label, required, children, hint, wide }: { label: string; requi
       {children}
       {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
     </label>
+  )
+}
+
+/** Native select with the browser arrow hidden and our own chevron inset from the border. */
+function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <div className="relative">
+      <select className={cn(field, "cursor-pointer appearance-none pr-12")} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Select an option</option>
+        {options.map((o) => <option key={o}>{o}</option>)}
+      </select>
+      <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-4 size-5 -translate-y-1/2 text-muted-foreground" />
+    </div>
   )
 }
 
@@ -138,11 +151,7 @@ export function WelcomeForm({ token, sunday }: { token: string; sunday: string }
           <input className={field} type="email" inputMode="email" autoComplete="email" placeholder="jane@email.com" value={f.email} onChange={(e) => set("email", e.target.value)} />
         </Field>
         <Field label="Gender">
-          <select className={field} value={f.gender} onChange={(e) => set("gender", e.target.value)}>
-            <option value="">Select an option</option>
-            <option>Female</option>
-            <option>Male</option>
-          </select>
+          <Select value={f.gender} onChange={(v) => set("gender", v)} options={["Female", "Male"]} />
         </Field>
         <Field label="Birthday (Month & Day)" hint="e.g. 08-15 for 15 August">
           <input className={field} inputMode="numeric" placeholder="08-15" maxLength={5} value={f.birthday}
@@ -160,16 +169,10 @@ export function WelcomeForm({ token, sunday }: { token: string; sunday: string }
       <Section title="About your visit">
         <Grid>
         <Field label="How did you hear about us?">
-          <select className={field} value={f.howHeard} onChange={(e) => set("howHeard", e.target.value)}>
-            <option value="">Select an option</option>
-            {HOW_HEARD.map((o) => <option key={o}>{o}</option>)}
-          </select>
+          <Select value={f.howHeard} onChange={(v) => set("howHeard", v)} options={HOW_HEARD} />
         </Field>
         <Field label="Are you looking for a church home?">
-          <select className={field} value={f.churchHome} onChange={(e) => set("churchHome", e.target.value)}>
-            <option value="">Select an option</option>
-            {CHURCH_HOME.map((o) => <option key={o}>{o}</option>)}
-          </select>
+          <Select value={f.churchHome} onChange={(v) => set("churchHome", v)} options={CHURCH_HOME} />
         </Field>
         </Grid>
       </Section>
