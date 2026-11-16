@@ -30,6 +30,7 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
       statusHistory: { orderBy: { changedAt: "desc" } },
       followUps: { orderBy: { date: "desc" } },
       attendance: { select: { serviceId: true } },
+      firstTimerForms: { orderBy: { createdAt: "desc" }, include: { link: { select: { serviceDate: true } } } },
     },
   })
   if (!member) notFound()
@@ -97,6 +98,40 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
         <CardHeader><CardTitle className="text-base">Attendance ({strip.length} Sundays)</CardTitle></CardHeader>
         <CardContent><AttendanceStrip items={strip} /></CardContent>
       </Card>
+
+      {member.firstTimerForms.map((f) => {
+        const rows: [string, React.ReactNode][] = [
+          ["Name given", f.fullName],
+          ["Phone", <span key="p" className="tabular-nums">{displayPhone(f.phone) || "—"}{!f.onWhatsapp && <span className="text-muted-foreground"> · not on WhatsApp</span>}</span>],
+          ["Email", show(f.email)],
+          ["Gender", show(f.gender)],
+          ["Birthday", show(f.birthday)],
+          ["Address", show(f.address)],
+          ["How they heard", show(f.howHeard)],
+          ["Looking for a church home", show(f.churchHome)],
+          ["Interested in", f.interests.length ? f.interests.join(", ") : "—"],
+          ["Wants to grow in", f.growth.length ? f.growth.join(", ") : "—"],
+          ["Prayer request", show(f.prayerRequest)],
+          ["Comments", show(f.comments)],
+          ["What we can improve", show(f.improve)],
+        ]
+        return (
+          <Card key={f.id}>
+            <CardHeader>
+              <CardTitle className="text-base">First-timer form · Sunday {formatDate(f.link.serviceDate, "long")}</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Submitted {f.createdAt.toLocaleString("en-GB", { timeZone: "Africa/Lagos" })}
+                {f.matchedExisting && " · matched someone already registered"}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                {rows.map(([k, v]) => (<Fragment key={k}><dt className="text-muted-foreground">{k}</dt><dd className="whitespace-pre-wrap break-words">{v}</dd></Fragment>))}
+              </dl>
+            </CardContent>
+          </Card>
+        )
+      })}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

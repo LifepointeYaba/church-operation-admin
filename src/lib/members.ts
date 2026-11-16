@@ -148,6 +148,7 @@ export async function mergeMembers(keepId: number, removeId: number) {
       SELECT ${keepId}, team_id FROM member_teams WHERE member_id = ${removeId} ON CONFLICT DO NOTHING`,
     prisma.followUp.updateMany({ where: { memberId: removeId }, data: { memberId: keepId } }),
     prisma.statusHistory.updateMany({ where: { memberId: removeId }, data: { memberId: keepId } }),
+    prisma.firstTimerResponse.updateMany({ where: { memberId: removeId }, data: { memberId: keepId } }),
     prisma.statusSuggestion.deleteMany({ where: { memberId: removeId } }),
     prisma.member.update({ where: { id: keepId }, data: fill }),
     prisma.member.delete({ where: { id: removeId } }),
