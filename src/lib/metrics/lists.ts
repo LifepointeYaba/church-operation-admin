@@ -5,9 +5,11 @@ import { activityOf, type MemberStat } from "./index"
 export function callLists(stats: MemberStat[], refIso: string, s: AppSettings) {
   const byLastAsc = (a: MemberStat, b: MemberStat) => (a.lastDate ?? "").localeCompare(b.lastDate ?? "")
   const worthCounting = (m: MemberStat) => m.visits >= s.minVisitsForRisk
+  // On a past Sunday, show what they were that day (e.g. First Timer), not their status today. Workers stay Workers.
+  const asOf = (status: string) => (m: MemberStat): MemberStat => (m.status === "Worker" ? m : { ...m, status })
   return {
-    firstTimers: stats.filter((m) => m.firstDate === refIso),
-    secondTimers: stats.filter((m) => m.secondDate === refIso),
+    firstTimers: stats.filter((m) => m.firstDate === refIso).map(asOf("First Timer")),
+    secondTimers: stats.filter((m) => m.secondDate === refIso).map(asOf("Second Timer")),
     newlyAtRisk: stats.filter((m) => worthCounting(m) && m.lastRn === s.atRiskWeeks + 1).sort(byLastAsc),
     newlyInactive: stats.filter((m) => worthCounting(m) && m.lastRn === s.inactiveWeeks + 1).sort(byLastAsc),
     workersMissed: stats
