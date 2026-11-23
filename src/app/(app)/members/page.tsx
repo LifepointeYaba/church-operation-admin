@@ -7,8 +7,11 @@ import { purgeExpiredDeletes } from "@/lib/members"
 import { PageHeader } from "@/components/common"
 import { MembersTable, type MemberRow } from "./members-table"
 import { AddMemberButton } from "./member-form"
+import { BulkUpdateButton } from "./bulk-update"
 
 export const metadata = { title: "Members" }
+// Bulk updates from a file can touch hundreds of members in one request.
+export const maxDuration = 60
 
 export default async function MembersPage({ searchParams }: { searchParams: Promise<{ q?: string; tab?: string }> }) {
   const user = await requirePermission("members.view")
@@ -47,7 +50,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Prom
       <PageHeader
         title="Members"
         description={`${rows.length.toLocaleString()} people · activity as of ${ref ? isoDate(ref.date) : "—"}`}
-        actions={<AddMemberButton statuses={settings.statuses} />}
+        actions={<><BulkUpdateButton statuses={settings.statuses} /><AddMemberButton statuses={settings.statuses} /></>}
       />
       <MembersTable
         rows={rows}

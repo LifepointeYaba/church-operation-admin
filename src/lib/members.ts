@@ -3,7 +3,8 @@ import { prisma } from "./db"
 import { normalizePhone } from "./phone"
 import { cleanName, nameKey } from "./keys"
 import { cleanEmail, cleanGender, flagsFor } from "./import/attendance"
-import { audit } from "./audit"
+import { audit, clientIp, type Actor } from "./audit"
+import type { CurrentMember, MemberUpdate } from "./import/member-updates"
 import { refreshDerivedMemberData } from "./import/apply"
 
 export const memberInput = z.object({
@@ -194,4 +195,40 @@ export async function purgeExpiredDeletes() {
   const old = await prisma.member.findMany({ where: { deletedAt: { lt: cutoff } }, select: { id: true } })
   for (const m of old) await eraseMember(m.id)
   return old.length
+}
+
+/** Current members (with team names) for planning a bulk update from a file. */
+export async function membersForBulkUpdate(): Promise<CurrentMember[]> {
+  const rows = await prisma.member.findMany({ include: { teams: { include: { team: { select: { name: true } } } } } })
+  return rows.map(({ teams, ...m }) => ({ ...m, teams: teams.map((t) => t.team.name) }))
+}
+
+/** Save a planned bulk update: only changed fields, with status history and one audit entry per member (revertible). */
+export async function applyMemberUpdates(updates: MemberUpdate[], actor: Actor | null, reason = "Bulk update from file") {
+  const ip = await clientIp()
+  const CHUNK = 10
+  for (let i = 0; i < updates.length; i += CHUNK) {
+    await Promise.all(updates.slice(i, i + CHUNK).map(async (u) => {
+      const scalar = u.changes.filter((c) => c.field !== "teams")
+      if (scalar.length) {
+        await prisma.member.update({ where: { id: u.memberId }, data: u.data })
+        const status = scalar.find((c) => c.field === "status")
+        if (status) await prisma.statusHistory.create({ data: { memberId: u.memberId, old: status.before, new: status.after!, reason } })
+        await audit("update", "member", u.memberId,
+          Object.fromEntries(scalar.map((c) => [c.field, c.before])), Object.fromEntries(scalar.map((c) => [c.field, c.after])), ip, actor)
+      }
+      if (u.teams) {
+        const names = [...new Set(u.teams.map(cleanName).filter(Boolean))]
+        const before = u.changes.find((c) => c.field === "teams")?.before
+        await prisma.team.createMany({ data: names.map((name) => ({ name })), skipDuplicates: true })
+        const teams = await prisma.team.findMany({ where: { name: { in: names } } })
+        await prisma.$transaction([
+          prisma.memberTeam.deleteMany({ where: { memberId: u.memberId } }),
+          prisma.memberTeam.createMany({ data: teams.map((t) => ({ memberId: u.memberId, teamId: t.id })) }),
+        ])
+        await audit("update", "member", u.memberId, { teams: before ? before.split(", ") : [] }, { teams: names }, ip, actor)
+      }
+    }))
+  }
+  if (updates.some((u) => "nameKey" in u.data || "phoneKey" in u.data)) await refreshDerivedMemberData(prisma)
 }

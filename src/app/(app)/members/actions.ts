@@ -7,8 +7,11 @@ import { audit } from "@/lib/audit"
 import { refreshData } from "@/lib/revalidate"
 import {
   ClashError, createMember, eraseMember, findDuplicates, mergeMembers, restore, revertAudit, setStatus, setTeams,
-  softDelete, updateMember, type MemberInput,
+  softDelete, updateMember, type MemberInput, applyMemberUpdates, membersForBulkUpdate,
 } from "@/lib/members"
+import { readGrid } from "@/lib/import/csv"
+import { parseMemberUpdates, planMemberUpdates } from "@/lib/import/member-updates"
+import { getSettings } from "@/lib/settings"
 
 export type Result<T = unknown> = { ok: true; data?: T } | { ok: false; error: string; clashId?: number }
 
@@ -93,4 +96,46 @@ export async function searchMembersAction(q: string, limit = 20) {
     orderBy: [{ firstName: "asc" }],
     take: limit,
   })
+}
+
+/** Read an uploaded file and work out what it would change. Nothing is saved. */
+async function planFromFile(form: FormData) {
+  const file = form.get("file")
+  if (!(file instanceof File) || file.size === 0) throw new Error("Choose a CSV or Excel file")
+  if (file.size > 10 * 1024 * 1024) throw new Error("File is larger than 10 MB")
+  const parsed = parseMemberUpdates(readGrid(Buffer.from(await file.arrayBuffer()), file.name))
+  const [members, settings] = await Promise.all([membersForBulkUpdate(), getSettings()])
+  return { file, plan: planMemberUpdates(parsed, members, settings.statuses) }
+}
+
+export async function previewMemberUpdatesAction(form: FormData) {
+  const user = await requireUser()
+  if (!can(user, "members.edit")) return FORBIDDEN
+  try {
+    const { plan } = await planFromFile(form)
+    return {
+      ok: true as const,
+      updates: plan.updates.map(({ row, memberId, name, changes }) => ({ row, memberId, name, changes })),
+      unchanged: plan.unchanged, errors: plan.errors, columns: plan.columns, ignoredColumns: plan.ignoredColumns,
+    }
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Couldn’t read the file" }
+  }
+}
+
+/** Re-reads the file (so what's saved matches the data right now) and saves the rows that change something. */
+export async function applyMemberUpdatesAction(form: FormData) {
+  const user = await requireUser()
+  if (!can(user, "members.edit")) return FORBIDDEN
+  try {
+    const { file, plan } = await planFromFile(form)
+    const actor = { id: user.id, email: user.email ?? null }
+    await applyMemberUpdates(plan.updates, actor)
+    await audit("bulk_update", "members", null, null,
+      { file: file.name, updated: plan.updates.length, unchanged: plan.unchanged, skipped: plan.errors.length }, undefined, actor)
+    refreshData()
+    return { ok: true as const, updated: plan.updates.length, unchanged: plan.unchanged, skipped: plan.errors.length }
+  } catch (e) {
+    return { ok: false as const, error: e instanceof Error ? e.message : "Something went wrong" }
+  }
 }
