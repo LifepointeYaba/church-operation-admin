@@ -68,9 +68,10 @@ export async function sundayDetails(dateIso: string, breakWeeks: number): Promis
     const prev = r.prev ? isoDate(r.prev) : null
     const missed = prev != null && pos.has(prev) ? here - pos.get(prev)! - 1 : 0
     // Same rule as the weekly numbers: workers never count as first or second timers.
-    if (r.ord === 1 && r.status !== "Worker") firstTimers.push(p)
+    // Badge shows what they were on this Sunday, not their status today.
+    if (r.ord === 1 && r.status !== "Worker") firstTimers.push({ ...p, status: "First Timer" })
     else if (r.ord === 2 && r.status !== "Worker" && prev) {
-      group(second, prev, missed === 0 ? `Returned from last week (${nice(prev)})` : `First came ${nice(prev)}`, p)
+      group(second, prev, missed === 0 ? `Returned from last week (${nice(prev)})` : `First came ${nice(prev)}`, { ...p, status: "Second Timer" })
     } else if (r.ord > 2 && prev && missed >= breakWeeks) {
       group(back, prev, `Last came ${nice(prev)} · missed ${missed} Sundays`, p)
     }
