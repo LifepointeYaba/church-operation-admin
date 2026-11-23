@@ -63,7 +63,7 @@ export default async function FirstTimersPage({ searchParams }: { searchParams: 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Sunday {formatDate(date, "long")}</CardTitle>
-          <CardDescription>The form opens the day before and closes 7 days after the Sunday.</CardDescription>
+          <CardDescription>The form opens the day before the Sunday and closes at the end of that Sunday.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <GenerateLinkForm date={date} hasLink={!!link} />

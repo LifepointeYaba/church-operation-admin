@@ -11,9 +11,9 @@ import { getSettings } from "./settings"
 import { isoDate, isSunday, todayLagos } from "./dates"
 import { CHURCH_HOME, GROWTH, HOW_HEARD, INTERESTS } from "./first-timers-shared"
 
-/** Links accept answers from the day before their Sunday until 7 days after it. */
+/** Links accept answers from the day before their Sunday until the end of that Sunday (Lagos time), so an old QR code can't be reused the next week. */
 const OPENS_DAYS_BEFORE = 1
-const CLOSES_DAYS_AFTER = 7
+const CLOSES_DAYS_AFTER = 0
 
 const toDate = (iso: string) => new Date(`${iso}T00:00:00.000Z`)
 

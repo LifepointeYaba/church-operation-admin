@@ -18,9 +18,10 @@ describe("linkWindow", () => {
     expect(linkWindow(sunday, d("2026-11-13")).open).toBe(false)
     expect(linkWindow(sunday, d("2026-11-14")).open).toBe(true)
   })
-  it("closes 7 days after", () => {
-    expect(linkWindow(sunday, d("2026-11-22")).open).toBe(true)
-    expect(linkWindow(sunday, d("2026-11-23"))).toMatchObject({ open: false, reason: "closed" })
+  it("stays open through the Sunday and closes the next day", () => {
+    expect(linkWindow(sunday, d("2026-11-15")).open).toBe(true)
+    expect(linkWindow(sunday, d("2026-11-16"))).toMatchObject({ open: false, reason: "closed" })
+    expect(linkWindow(sunday, d("2026-11-22"))).toMatchObject({ open: false, reason: "closed" })
   })
 })
 
